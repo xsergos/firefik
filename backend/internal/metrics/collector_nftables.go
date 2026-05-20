@@ -71,6 +71,7 @@ func (c *NFTablesCollector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
+		totals := map[string][2]uint64{}
 		for _, rule := range rules {
 			var packets, bytes uint64
 			var target string
@@ -100,8 +101,13 @@ func (c *NFTablesCollector) Collect(ch chan<- prometheus.Metric) {
 				continue
 			}
 
-			ch <- prometheus.MustNewConstMetric(c.packetsDesc, prometheus.CounterValue, float64(packets), chain.Name, target)
-			ch <- prometheus.MustNewConstMetric(c.bytesDesc, prometheus.CounterValue, float64(bytes), chain.Name, target)
+			t := totals[target]
+			totals[target] = [2]uint64{t[0] + packets, t[1] + bytes}
+		}
+
+		for target, t := range totals {
+			ch <- prometheus.MustNewConstMetric(c.packetsDesc, prometheus.CounterValue, float64(t[0]), chain.Name, target)
+			ch <- prometheus.MustNewConstMetric(c.bytesDesc, prometheus.CounterValue, float64(t[1]), chain.Name, target)
 		}
 	}
 }

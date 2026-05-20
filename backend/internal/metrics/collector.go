@@ -60,6 +60,7 @@ func (c *IPTablesCollector) Collect(ch chan<- prometheus.Metric) {
 		if err != nil {
 			continue
 		}
+		totals := map[string][2]float64{}
 		for _, row := range stats {
 			if len(row) < 3 {
 				continue
@@ -69,11 +70,13 @@ func (c *IPTablesCollector) Collect(ch chan<- prometheus.Metric) {
 				target = "unknown"
 			}
 
-			packets := parseCounter(row[0])
-			bytes := parseCounter(row[1])
+			t := totals[target]
+			totals[target] = [2]float64{t[0] + parseCounter(row[0]), t[1] + parseCounter(row[1])}
+		}
 
-			ch <- prometheus.MustNewConstMetric(c.packetsDesc, prometheus.CounterValue, packets, chain, target)
-			ch <- prometheus.MustNewConstMetric(c.bytesDesc, prometheus.CounterValue, bytes, chain, target)
+		for target, t := range totals {
+			ch <- prometheus.MustNewConstMetric(c.packetsDesc, prometheus.CounterValue, t[0], chain, target)
+			ch <- prometheus.MustNewConstMetric(c.bytesDesc, prometheus.CounterValue, t[1], chain, target)
 		}
 	}
 }
