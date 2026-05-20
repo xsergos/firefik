@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 type Registry struct {
@@ -298,6 +300,7 @@ func (s *HTTPServer) Handler() http.Handler {
 		mux.HandleFunc("/v1/logout", s.handleLogout)
 	}
 	mux.HandleFunc("/v1/whoami", s.handleWhoami)
+	mux.Handle("/metrics", http.HandlerFunc(s.requireBearer(promhttp.Handler().ServeHTTP)))
 	return mux
 }
 
