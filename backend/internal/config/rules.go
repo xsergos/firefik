@@ -19,6 +19,8 @@ type FileRuleSet struct {
 	DefaultPolicy string   `yaml:"defaultPolicy"`
 	Protocol      string   `yaml:"protocol"`
 	Profile       string   `yaml:"profile"`
+	Log           bool     `yaml:"log"`
+	LogPrefix     string   `yaml:"logPrefix"`
 }
 
 type FileHostRuleSet struct {

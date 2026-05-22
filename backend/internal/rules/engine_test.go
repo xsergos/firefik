@@ -735,7 +735,7 @@ func TestMergeFileRules(t *testing.T) {
 	cfg := docker.ContainerConfig{}
 	rf := config.RulesFile{
 		Rules: []config.FileRuleSet{
-			{Container: "web", Name: "http", Ports: []uint16{80, 443}, DefaultPolicy: "DROP"},
+			{Container: "web", Name: "http", Ports: []uint16{80, 443}, DefaultPolicy: "DROP", Log: true, LogPrefix: "  web-http  "},
 			{Container: "db", Name: "sql", Ports: []uint16{5432}},
 		},
 	}
@@ -751,6 +751,12 @@ func TestMergeFileRules(t *testing.T) {
 	}
 	if out.RuleSets[0].Name != "http" {
 		t.Errorf("unexpected rule set name: %q", out.RuleSets[0].Name)
+	}
+	if !out.RuleSets[0].Log {
+		t.Errorf("Log not merged, got %v", out.RuleSets[0].Log)
+	}
+	if out.RuleSets[0].LogPrefix != "web-http" {
+		t.Errorf("LogPrefix not trimmed/merged, got %q", out.RuleSets[0].LogPrefix)
 	}
 
 	cfg2 := docker.ContainerConfig{

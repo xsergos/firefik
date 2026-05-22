@@ -719,6 +719,8 @@ func MergeFileRules(cfg docker.ContainerConfig, containerName string, rf config.
 			Blocklist: bl,
 			Protocol:  fr.Protocol,
 			Profile:   fr.Profile,
+			Log:       fr.Log,
+			LogPrefix: strings.TrimSpace(fr.LogPrefix),
 		})
 	}
 	return cfg

@@ -217,3 +217,34 @@ func TestLoadRulesFile_HostRules_LogField(t *testing.T) {
 		t.Errorf("web rule should default log=false: %+v", rf.HostRules[1])
 	}
 }
+
+func TestLoadRulesFile_Rules_LogField(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rules.yml")
+	content := `rules:
+  - container: web
+    name: http
+    protocol: tcp
+    ports: [80]
+    log: true
+    logPrefix: WEB-HTTP
+  - container: db
+    name: sql
+    ports: [5432]
+`
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	rf, err := LoadRulesFile(path)
+	if err != nil {
+		t.Fatalf("LoadRulesFile: %v", err)
+	}
+	if !rf.Rules[0].Log {
+		t.Errorf("http rule should have log=true: %+v", rf.Rules[0])
+	}
+	if rf.Rules[0].LogPrefix != "WEB-HTTP" {
+		t.Errorf("http rule logPrefix = %q", rf.Rules[0].LogPrefix)
+	}
+	if rf.Rules[1].Log {
+		t.Errorf("sql rule should default log=false: %+v", rf.Rules[1])
+	}
+}
