@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM golang:1.26.3-alpine AS builder
+FROM golang:1.26.4-alpine AS builder
 WORKDIR /app
 
 RUN apk add --no-cache iptables-dev build-base git

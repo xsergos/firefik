@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:26.2.0-alpine AS frontend-build
+FROM node:26.3.0-alpine AS frontend-build
 WORKDIR /app
 
 ARG VITE_PANEL_MODE=
@@ -12,7 +12,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM golang:1.26.3-alpine AS caddy-build
+FROM golang:1.26.4-alpine AS caddy-build
 ARG CADDY_VERSION=v2.11.3
 RUN apk add --no-cache git
 ENV CGO_ENABLED=0
