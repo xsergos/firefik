@@ -81,6 +81,24 @@ func TestCTStateExprsCanonical(t *testing.T) {
 	}
 }
 
+func TestIifLoopbackAcceptExprs(t *testing.T) {
+	got := iifLoopbackAcceptExprs()
+	if len(got) != 3 {
+		t.Fatalf("expected 3 exprs, got %d", len(got))
+	}
+	m, ok := got[0].(*expr.Meta)
+	if !ok || m.Key != expr.MetaKeyIIFNAME {
+		t.Errorf("first expr should be Meta{IIFNAME}, got %T", got[0])
+	}
+	c, ok := got[1].(*expr.Cmp)
+	if !ok || c.Op != expr.CmpOpEq || string(c.Data) != "lo\x00" {
+		t.Errorf("second expr should be Cmp eq \"lo\\x00\", got %+v", got[1])
+	}
+	if v, ok := got[2].(*expr.Verdict); !ok || v.Kind != expr.VerdictAccept {
+		t.Errorf("last expr should be Verdict{Accept}, got %T", got[2])
+	}
+}
+
 func TestBinaryUint32(t *testing.T) {
 	got := binaryUint32(0x01020304)
 	if len(got) != 4 {

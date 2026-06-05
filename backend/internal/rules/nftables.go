@@ -147,6 +147,14 @@ func ctStateEstablishedRelatedAcceptExprs() []expr.Any {
 	}
 }
 
+func iifLoopbackAcceptExprs() []expr.Any {
+	return []expr.Any{
+		&expr.Meta{Key: expr.MetaKeyIIFNAME, Register: 1},
+		&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte("lo\x00")},
+		&expr.Verdict{Kind: expr.VerdictAccept},
+	}
+}
+
 func binaryUint32(v uint32) []byte {
 	b := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, v)

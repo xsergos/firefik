@@ -37,6 +37,12 @@ func (b *IPTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		}
 	}
 
+	if NormaliseHostDefault(defaultPolicy) == "DROP" {
+		if err := b.ipt.Append(filterTable, hostChainName, "-i", "lo", "-j", "ACCEPT"); err != nil {
+			return fmt.Errorf("host: append loopback accept: %w", err)
+		}
+	}
+
 	for _, rule := range rules {
 		proto := rule.protoNormalised()
 		for _, peer := range rule.Blocklist {

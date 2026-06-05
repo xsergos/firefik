@@ -37,6 +37,14 @@ func (b *NFTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		})
 	}
 
+	if NormaliseHostDefault(defaultPolicy) == "DROP" {
+		b.conn.AddRule(&nftables.Rule{
+			Table: b.table,
+			Chain: chain,
+			Exprs: iifLoopbackAcceptExprs(),
+		})
+	}
+
 	for _, rule := range rules {
 		proto := strings.ToLower(strings.TrimSpace(rule.Protocol))
 		for _, peer := range rule.Blocklist {
