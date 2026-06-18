@@ -44,7 +44,10 @@ function renderAt(path: string) {
         <Routes>
           <Route element={<AppShell />}>
             <Route index element={<div data-testid="outlet-dashboard">Dash</div>} />
-            <Route path="containers" element={<div data-testid="outlet-containers">Containers</div>} />
+            <Route
+              path="containers"
+              element={<div data-testid="outlet-containers">Containers</div>}
+            />
             <Route path="rules" element={<div data-testid="outlet-rules">Rules</div>} />
             <Route path="policies" element={<div data-testid="outlet-policies">Policies</div>} />
             <Route path="proposals" element={<div data-testid="outlet-proposals">Proposals</div>} />

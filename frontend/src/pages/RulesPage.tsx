@@ -82,7 +82,8 @@ type Filters = {
 function filterEntries(entries: RuleEntry[], filters: Filters): RuleEntry[] {
   const text = filters.text.trim().toLowerCase();
   const portNum = filters.port.trim() === "" ? null : Number(filters.port.trim());
-  const portValid = portNum !== null && Number.isFinite(portNum) && portNum >= 0 && portNum <= 65535;
+  const portValid =
+    portNum !== null && Number.isFinite(portNum) && portNum >= 0 && portNum <= 65535;
   const address = filters.address.trim().toLowerCase();
   if (!text && !portValid && !address) return entries;
 
@@ -155,8 +156,7 @@ export default function RulesPage() {
       ) : !data || data.length === 0 ? (
         <p className="text-muted-foreground">
           No active firewall rules. Start a container with{" "}
-          <code className="text-xs bg-muted px-1 py-0.5 rounded">firefik.enable=true</code>.
-          See the{" "}
+          <code className="text-xs bg-muted px-1 py-0.5 rounded">firefik.enable=true</code>. See the{" "}
           <a
             className="underline"
             href="https://github.com/xsergos/firefik#docker-labels"
@@ -286,7 +286,11 @@ function AgentSection({
         <p className="text-sm text-muted-foreground pl-1">{emptyLabel}</p>
       ) : (
         entries.map((entry) => (
-          <EntryBlock key={`${entry.containerID}:${entry.containerName}`} entry={entry} isHost={isHost} />
+          <EntryBlock
+            key={`${entry.containerID}:${entry.containerName}`}
+            entry={entry}
+            isHost={isHost}
+          />
         ))
       )}
     </div>
@@ -297,9 +301,7 @@ function EntryBlock({ entry, isHost }: { entry: RuleEntry; isHost: boolean }) {
   return (
     <div className="border rounded-md p-3 space-y-2">
       <div className="flex items-center gap-3 flex-wrap text-sm">
-        <span className="font-mono font-medium">
-          {entry.containerName || entry.containerID}
-        </span>
+        <span className="font-mono font-medium">{entry.containerName || entry.containerID}</span>
         {!isHost && (
           <Badge variant="outline" className="text-xs font-normal">
             {entry.containerID}
@@ -348,7 +350,11 @@ function RuleSetRow({ rs }: { rs: FirewallRuleSetDTO }) {
     <TableRow>
       <TableCell className="font-medium">{rs.name}</TableCell>
       <TableCell>
-        {rs.ports?.length ? rs.ports.join(", ") : <span className="text-muted-foreground">any</span>}
+        {rs.ports?.length ? (
+          rs.ports.join(", ")
+        ) : (
+          <span className="text-muted-foreground">any</span>
+        )}
       </TableCell>
       <TableCell>
         <Badge variant="outline">{(rs.protocol || "TCP").toUpperCase()}</Badge>
@@ -359,16 +365,10 @@ function RuleSetRow({ rs }: { rs: FirewallRuleSetDTO }) {
       <TableCell>
         <CIDRList items={rs.blocklist} variant="destructive" />
       </TableCell>
-      <TableCell>
-        {rs.profile ? <Badge variant="secondary">{rs.profile}</Badge> : "—"}
-      </TableCell>
+      <TableCell>{rs.profile ? <Badge variant="secondary">{rs.profile}</Badge> : "—"}</TableCell>
       <TableCell className="space-x-1">
         {rs.log && <Badge variant="outline">log</Badge>}
-        {rs.rateLimit && (
-          <Badge variant="outline">
-            {rs.rateLimit.rate}/s
-          </Badge>
-        )}
+        {rs.rateLimit && <Badge variant="outline">{rs.rateLimit.rate}/s</Badge>}
         {rs.geoBlock && rs.geoBlock.length > 0 && (
           <Badge variant="destructive">block:{rs.geoBlock.join(",")}</Badge>
         )}
@@ -387,8 +387,7 @@ function CIDRList({
   items?: string[];
   variant?: "secondary" | "destructive";
 }) {
-  if (!items || items.length === 0)
-    return <span className="text-muted-foreground">—</span>;
+  if (!items || items.length === 0) return <span className="text-muted-foreground">—</span>;
   if (items.length <= 3)
     return (
       <div className="flex flex-wrap gap-1">

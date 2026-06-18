@@ -156,15 +156,11 @@ export default function ProposalsPage() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Ports</p>
-                  <p className="font-mono text-xs break-all">
-                    {active.ports?.join(", ") || "—"}
-                  </p>
+                  <p className="font-mono text-xs break-all">{active.ports?.join(", ") || "—"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Peers</p>
-                  <p className="font-mono text-xs break-all">
-                    {active.peers?.join(", ") || "—"}
-                  </p>
+                  <p className="font-mono text-xs break-all">{active.peers?.join(", ") || "—"}</p>
                 </div>
               </div>
 
@@ -204,7 +200,8 @@ export default function ProposalsPage() {
                 <div className="border rounded p-2 bg-muted/40">
                   <div className="flex items-baseline justify-between mb-1">
                     <span className="text-xs text-muted-foreground">
-                      {artifact.mode === "labels" ? "docker-compose labels" : "policy DSL"} (paste into your config)
+                      {artifact.mode === "labels" ? "docker-compose labels" : "policy DSL"} (paste
+                      into your config)
                     </span>
                     <button
                       onClick={() => {

@@ -51,7 +51,13 @@ const SNAP = {
     status: "healthy" as const,
   },
   snapshot: {
-    agent: { instance_id: "host-a", hostname: "host-a", version: "0.2.0", backend: "nft", chain: "FF" },
+    agent: {
+      instance_id: "host-a",
+      hostname: "host-a",
+      version: "0.2.0",
+      backend: "nft",
+      chain: "FF",
+    },
     containers: [
       {
         id: "c1234567890abcdef",
@@ -122,11 +128,7 @@ describe("AgentDetailPage", () => {
     const applyBtns = screen.getAllByRole("button", { name: "Apply" });
     await user.click(applyBtns[0]!);
     await waitFor(() =>
-      expect(api.sendAgentCommand).toHaveBeenCalledWith(
-        "host-a",
-        "apply",
-        "c1234567890abcdef",
-      ),
+      expect(api.sendAgentCommand).toHaveBeenCalledWith("host-a", "apply", "c1234567890abcdef"),
     );
   });
 
@@ -137,9 +139,7 @@ describe("AgentDetailPage", () => {
       snapshot: null,
     });
     renderAt();
-    await waitFor(() =>
-      expect(screen.getByText(/No snapshot yet/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/No snapshot yet/i)).toBeInTheDocument());
   });
 
   it("renders an error state when fetch fails", async () => {
@@ -155,8 +155,6 @@ describe("AgentDetailPage", () => {
     const api = await import("@/lib/fleetApi");
     vi.mocked(api.fetchAgentStats).mockRejectedValue(new Error("timeout"));
     renderAt();
-    await waitFor(() =>
-      expect(screen.getByText(/Stats pull timed out/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Stats pull timed out/i)).toBeInTheDocument());
   });
 });

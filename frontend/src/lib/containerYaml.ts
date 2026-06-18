@@ -31,9 +31,7 @@ export function containerToLabelsYaml(ctr: ContainerDTO): string {
       lines.push(`  ${prefix}.geoallow: "${rs.geoAllow.join(",")}"`);
     }
     if (rs.rateLimit) {
-      lines.push(
-        `  ${prefix}.ratelimit: "${rs.rateLimit.rate}/s,burst=${rs.rateLimit.burst}"`,
-      );
+      lines.push(`  ${prefix}.ratelimit: "${rs.rateLimit.rate}/s,burst=${rs.rateLimit.burst}"`);
     }
     if (rs.log) lines.push(`  ${prefix}.log: "true"`);
     if (rs.logPrefix) lines.push(`  ${prefix}.logPrefix: "${rs.logPrefix}"`);

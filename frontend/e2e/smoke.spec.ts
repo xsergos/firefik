@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 
-
 test.describe("Firefik UI smoke", () => {
   test("dashboard renders without runtime errors", async ({ page }) => {
     const errors: string[] = [];
@@ -18,8 +17,14 @@ test.describe("Firefik UI smoke", () => {
   test("rules page reaches API", async ({ page }) => {
     await page.goto("/rules");
     const visible = await Promise.race([
-      page.getByRole("heading", { name: /active rules/i }).waitFor({ state: "visible" }).then(() => true),
-      page.getByText(/no active firewall rules/i).waitFor({ state: "visible" }).then(() => true),
+      page
+        .getByRole("heading", { name: /active rules/i })
+        .waitFor({ state: "visible" })
+        .then(() => true),
+      page
+        .getByText(/no active firewall rules/i)
+        .waitFor({ state: "visible" })
+        .then(() => true),
     ]);
     expect(visible).toBe(true);
   });
@@ -33,13 +38,9 @@ test.describe("Firefik UI smoke", () => {
   test("theme toggle switches classes", async ({ page }) => {
     await page.goto("/");
     const toggle = page.getByRole("button", { name: /mode/i });
-    const before = await page.evaluate(() =>
-      document.documentElement.classList.contains("dark"),
-    );
+    const before = await page.evaluate(() => document.documentElement.classList.contains("dark"));
     await toggle.click();
-    const after = await page.evaluate(() =>
-      document.documentElement.classList.contains("dark"),
-    );
+    const after = await page.evaluate(() => document.documentElement.classList.contains("dark"));
     expect(before).not.toBe(after);
   });
 
@@ -52,7 +53,10 @@ test.describe("Firefik UI smoke", () => {
     try {
       await row.waitFor({ state: "visible", timeout: 15_000 });
     } catch {
-      test.skip(true, "mock e2e target not present — compose override not applied, skipping apply/disable flow");
+      test.skip(
+        true,
+        "mock e2e target not present — compose override not applied, skipping apply/disable flow",
+      );
       return;
     }
 

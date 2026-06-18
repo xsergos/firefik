@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Templates page", () => {
-  test("loads, lists templates from intercepted API, and shows the publish form", async ({ page }) => {
+  test("loads, lists templates from intercepted API, and shows the publish form", async ({
+    page,
+  }) => {
     await page.route("**/api/templates", async (route) => {
       if (route.request().method() === "GET") {
         await route.fulfill({

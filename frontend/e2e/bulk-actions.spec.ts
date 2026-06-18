@@ -8,7 +8,10 @@ test.describe("Containers bulk actions", () => {
     const errorAlert = page.getByRole("alert");
     const state = await Promise.race([
       heading.waitFor({ state: "visible", timeout: 10_000 }).then(() => "ok"),
-      errorAlert.first().waitFor({ state: "visible", timeout: 10_000 }).then(() => "error"),
+      errorAlert
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => "error"),
     ]).catch(() => "timeout");
 
     if (state !== "ok") {

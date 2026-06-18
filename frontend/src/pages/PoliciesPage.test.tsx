@@ -3,7 +3,12 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PolicyDetail, PolicySimulateResponse, PolicySummary, PolicyValidateResponse } from "@/types/api";
+import type {
+  PolicyDetail,
+  PolicySimulateResponse,
+  PolicySummary,
+  PolicyValidateResponse,
+} from "@/types/api";
 import PoliciesPage from "./PoliciesPage";
 
 vi.mock("sonner", () => ({
@@ -11,7 +16,15 @@ vi.mock("sonner", () => ({
 }));
 
 vi.mock("./PolicyEditor", () => ({
-  default: ({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) => (
+  default: ({
+    value,
+    onChange,
+    className,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    className?: string;
+  }) => (
     <textarea
       data-testid="policy-editor"
       className={className}
@@ -138,10 +151,9 @@ describe("PoliciesPage", () => {
     vi.mocked(api.validatePolicy).mockResolvedValue(badValidation);
     renderPage();
     await screen.findByTestId("policy-editor");
-    await waitFor(
-      () => expect(screen.getByText(/unexpected token/i)).toBeInTheDocument(),
-      { timeout: 2000 },
-    );
+    await waitFor(() => expect(screen.getByText(/unexpected token/i)).toBeInTheDocument(), {
+      timeout: 2000,
+    });
     expect(screen.getByText(/deprecated keyword/i)).toBeInTheDocument();
   });
 
@@ -152,17 +164,12 @@ describe("PoliciesPage", () => {
 
     const nameInput = screen.getByPlaceholderText("web-public");
     await user.type(nameInput, "my-policy");
-    await user.type(
-      screen.getByPlaceholderText(/12-hex prefix or full id/i),
-      "abcdef012345",
-    );
+    await user.type(screen.getByPlaceholderText(/12-hex prefix or full id/i), "abcdef012345");
     await user.click(screen.getByRole("button", { name: "Simulate" }));
 
     const api = await import("@/lib/api");
     await waitFor(() => expect(api.simulatePolicy).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.getByText(/Simulation: web-public/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Simulation: web-public/i)).toBeInTheDocument());
     expect(screen.getByText(/heads up/i)).toBeInTheDocument();
     expect(screen.getByText(/rs0/)).toBeInTheDocument();
   });
@@ -186,10 +193,7 @@ describe("PoliciesPage", () => {
 
     const nameInput = screen.getByPlaceholderText("web-public");
     await user.type(nameInput, "my-policy");
-    await user.type(
-      screen.getByPlaceholderText(/why this change/i),
-      "first save",
-    );
+    await user.type(screen.getByPlaceholderText(/why this change/i), "first save");
     await waitFor(() => expect(screen.getByText(/Syntax OK/i)).toBeInTheDocument(), {
       timeout: 2000,
     });
@@ -215,9 +219,7 @@ describe("PoliciesPage", () => {
     const api = await import("@/lib/api");
     vi.mocked(api.fetchPolicies).mockResolvedValue([]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/No saved policies/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/No saved policies/i)).toBeInTheDocument());
   });
 
   it("toasts an error when loading the selected policy fails", async () => {
@@ -283,9 +285,7 @@ describe("PoliciesPage", () => {
     await user.type(screen.getByPlaceholderText("web-public"), "my-policy");
     await user.click(screen.getByRole("button", { name: "Simulate" }));
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining("policy is broken"),
-      ),
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("policy is broken")),
     );
   });
 
@@ -328,9 +328,7 @@ describe("PoliciesPage", () => {
     });
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining("version mismatch"),
-      ),
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("version mismatch")),
     );
   });
 
@@ -345,9 +343,7 @@ describe("PoliciesPage", () => {
     await user.type(screen.getByPlaceholderText("web-public"), "my-policy");
     await user.click(screen.getByRole("button", { name: "Simulate" }));
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(
-        expect.stringContaining("simulator died"),
-      ),
+      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("simulator died")),
     );
   });
 
@@ -373,10 +369,9 @@ describe("PoliciesPage", () => {
     });
     renderPage();
     await screen.findByTestId("policy-editor");
-    await waitFor(
-      () => expect(screen.getByText(/just an error/i)).toBeInTheDocument(),
-      { timeout: 2000 },
-    );
+    await waitFor(() => expect(screen.getByText(/just an error/i)).toBeInTheDocument(), {
+      timeout: 2000,
+    });
   });
 
   it("renders a no-constraints rule-set entry and skips the empty container badge", async () => {

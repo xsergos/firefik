@@ -61,30 +61,34 @@ describe("APIError", () => {
 
 describe("fetchContainers", () => {
   it("parses a successful response", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON(
-        [
-          {
-            id: "abcdef012345",
-            name: "nginx",
-            status: "running",
-            enabled: true,
-            firewallStatus: "active",
-            labels: { "firefik.enable": "true" },
-          },
-        ],
-        { status: 200 },
-      ),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON(
+          [
+            {
+              id: "abcdef012345",
+              name: "nginx",
+              status: "running",
+              enabled: true,
+              firewallStatus: "active",
+              labels: { "firefik.enable": "true" },
+            },
+          ],
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
     const out = await fetchContainers();
     expect(out).toHaveLength(1);
     expect(out[0]?.id).toBe("abcdef012345");
   });
 
   it("throws APIError on non-OK status with typed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "docker_unavailable", message: "dead" }, { status: 500 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "docker_unavailable", message: "dead" }, { status: 500 }),
+      ) as typeof fetch,
+    );
     await expect(fetchContainers()).rejects.toMatchObject({
       name: "APIError",
       status: 500,
@@ -102,9 +106,9 @@ describe("fetchContainers", () => {
   });
 
   it("falls back to internal_error when error body fails schema", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ unexpected: true }, { status: 502 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () => mockJSON({ unexpected: true }, { status: 502 })) as typeof fetch,
+    );
     await expect(fetchContainers()).rejects.toMatchObject({
       code: "internal_error",
       status: 502,
@@ -112,9 +116,7 @@ describe("fetchContainers", () => {
   });
 
   it("throws schema_mismatch APIError when payload shape is wrong", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ nope: 1 }, { status: 200 }),
-    ) as typeof fetch);
+    installFetch(vi.fn(async () => mockJSON({ nope: 1 }, { status: 200 })) as typeof fetch);
     await expect(fetchContainers()).rejects.toMatchObject({
       name: "APIError",
       code: "schema_mismatch",
@@ -139,13 +141,15 @@ describe("fetchContainers", () => {
   });
 
   it("propagates abort from caller signal without wrapping", async () => {
-    installFetch(vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
-      return new Promise<Response>((_, reject) => {
-        init?.signal?.addEventListener("abort", () =>
-          reject(new DOMException("aborted", "AbortError")),
-        );
-      });
-    }) as typeof fetch);
+    installFetch(
+      vi.fn((_url: RequestInfo | URL, init?: RequestInit) => {
+        return new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        });
+      }) as typeof fetch,
+    );
     const ctrl = new AbortController();
     const p = fetchContainers({ signal: ctrl.signal });
     ctrl.abort();
@@ -154,33 +158,39 @@ describe("fetchContainers", () => {
 
   it("rethrows non-abort fetch errors unchanged", async () => {
     const err = new Error("net down");
-    installFetch(vi.fn(async () => {
-      throw err;
-    }) as typeof fetch);
+    installFetch(
+      vi.fn(async () => {
+        throw err;
+      }) as typeof fetch,
+    );
     await expect(fetchContainers()).rejects.toBe(err);
   });
 });
 
 describe("fetchStats", () => {
   it("returns stats DTO on success", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON(
-        {
-          containers: { total: 2, running: 1, enabled: 1 },
-          traffic: [{ ts: "2026-04-23T10:00:00Z", accepted: 10, dropped: 1 }],
-        },
-        { status: 200 },
-      ),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON(
+          {
+            containers: { total: 2, running: 1, enabled: 1 },
+            traffic: [{ ts: "2026-04-23T10:00:00Z", accepted: 10, dropped: 1 }],
+          },
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
     const out = await fetchStats();
     expect(out.containers.total).toBe(2);
     expect(out.traffic).toHaveLength(1);
   });
 
   it("throws APIError on 500", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "internal_error", message: "oops" }, { status: 500 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "internal_error", message: "oops" }, { status: 500 }),
+      ) as typeof fetch,
+    );
     await expect(fetchStats()).rejects.toMatchObject({ status: 500, code: "internal_error" });
   });
 
@@ -192,29 +202,33 @@ describe("fetchStats", () => {
 
 describe("fetchRules", () => {
   it("parses rules list", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON(
-        [
-          {
-            containerID: "c1",
-            containerName: "n1",
-            status: "running",
-            defaultPolicy: "DROP",
-            ruleSets: [],
-          },
-        ],
-        { status: 200 },
-      ),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON(
+          [
+            {
+              containerID: "c1",
+              containerName: "n1",
+              status: "running",
+              defaultPolicy: "DROP",
+              ruleSets: [],
+            },
+          ],
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
     const out = await fetchRules();
     expect(out).toHaveLength(1);
     expect(out[0]?.defaultPolicy).toBe("DROP");
   });
 
   it("throws APIError on 4xx with typed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "invalid_id", message: "bad id" }, { status: 400 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "invalid_id", message: "bad id" }, { status: 400 }),
+      ) as typeof fetch,
+    );
     await expect(fetchRules()).rejects.toMatchObject({ status: 400, code: "invalid_id" });
   });
 
@@ -227,13 +241,14 @@ describe("fetchRules", () => {
 describe("fetchAuditHistory", () => {
   it("parses list with no limit", async () => {
     const seen: string[] = [];
-    installFetch(vi.fn(async (url: RequestInfo | URL) => {
-      seen.push(String(url));
-      return mockJSON(
-        [{ ts: "2026-04-23T10:00:00Z", action: "apply", source: "user" }],
-        { status: 200 },
-      );
-    }) as typeof fetch);
+    installFetch(
+      vi.fn(async (url: RequestInfo | URL) => {
+        seen.push(String(url));
+        return mockJSON([{ ts: "2026-04-23T10:00:00Z", action: "apply", source: "user" }], {
+          status: 200,
+        });
+      }) as typeof fetch,
+    );
     const out = await fetchAuditHistory();
     expect(out).toHaveLength(1);
     expect(seen[0]).toMatch(/\/api\/audit\/history$/);
@@ -241,10 +256,12 @@ describe("fetchAuditHistory", () => {
 
   it("appends limit query when provided", async () => {
     const seen: string[] = [];
-    installFetch(vi.fn(async (url: RequestInfo | URL) => {
-      seen.push(String(url));
-      return mockJSON([], { status: 200 });
-    }) as typeof fetch);
+    installFetch(
+      vi.fn(async (url: RequestInfo | URL) => {
+        seen.push(String(url));
+        return mockJSON([], { status: 200 });
+      }) as typeof fetch,
+    );
     await fetchAuditHistory(25);
     expect(seen[0]).toContain("?limit=25");
   });
@@ -309,9 +326,11 @@ describe("applyContainerRules", () => {
   });
 
   it("throws APIError with typed body on error", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "apply_failed", message: "nope" }, { status: 500 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "apply_failed", message: "nope" }, { status: 500 }),
+      ) as typeof fetch,
+    );
     await expect(applyContainerRules("abc")).rejects.toMatchObject({
       code: "apply_failed",
       userMessage: "Failed to apply firewall rules.",
@@ -339,9 +358,11 @@ describe("deactivateContainerRules", () => {
   });
 
   it("throws APIError on failure", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "disable_failed", message: "nope" }, { status: 500 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "disable_failed", message: "nope" }, { status: 500 }),
+      ) as typeof fetch,
+    );
     await expect(deactivateContainerRules("zz")).rejects.toMatchObject({
       code: "disable_failed",
     });
@@ -363,9 +384,11 @@ describe("bulkContainerActions", () => {
   });
 
   it("throws APIError with typed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "invalid_id", message: "bad" }, { status: 400 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "invalid_id", message: "bad" }, { status: 400 }),
+      ) as typeof fetch,
+    );
     await expect(bulkContainerActions(actions)).rejects.toMatchObject({
       status: 400,
       code: "invalid_id",
@@ -380,9 +403,7 @@ describe("bulkContainerActions", () => {
   });
 
   it("throws schema_mismatch on malformed OK body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ results: "nope" }, { status: 200 }),
-    ) as typeof fetch);
+    installFetch(vi.fn(async () => mockJSON({ results: "nope" }, { status: 200 })) as typeof fetch);
     await expect(bulkContainerActions(actions)).rejects.toMatchObject({
       code: "schema_mismatch",
     });
@@ -391,20 +412,21 @@ describe("bulkContainerActions", () => {
 
 describe("fetchPolicies", () => {
   it("parses policy list", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON(
-        [{ name: "p1", version: "v1", source: "/x", rules: 2 }],
-        { status: 200 },
-      ),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON([{ name: "p1", version: "v1", source: "/x", rules: 2 }], { status: 200 }),
+      ) as typeof fetch,
+    );
     const out = await fetchPolicies();
     expect(out[0]?.name).toBe("p1");
   });
 
   it("throws APIError on 500", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "internal_error", message: "boom" }, { status: 500 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "internal_error", message: "boom" }, { status: 500 }),
+      ) as typeof fetch,
+    );
     await expect(fetchPolicies()).rejects.toMatchObject({ status: 500 });
   });
 
@@ -417,13 +439,15 @@ describe("fetchPolicies", () => {
 describe("fetchPolicy", () => {
   it("encodes the name in the URL", async () => {
     const seen: string[] = [];
-    installFetch(vi.fn(async (url: RequestInfo | URL) => {
-      seen.push(String(url));
-      return mockJSON(
-        { name: "a/b", version: "v1", dsl: "policy", ruleSets: [] },
-        { status: 200 },
-      );
-    }) as typeof fetch);
+    installFetch(
+      vi.fn(async (url: RequestInfo | URL) => {
+        seen.push(String(url));
+        return mockJSON(
+          { name: "a/b", version: "v1", dsl: "policy", ruleSets: [] },
+          { status: 200 },
+        );
+      }) as typeof fetch,
+    );
     await fetchPolicy("a/b");
     expect(seen[0]).toContain("/api/policies/a%2Fb");
   });
@@ -434,9 +458,11 @@ describe("fetchPolicy", () => {
   });
 
   it("throws APIError on 404", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "not_found", message: "nope" }, { status: 404 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "not_found", message: "nope" }, { status: 404 }),
+      ) as typeof fetch,
+    );
     await expect(fetchPolicy("x")).rejects.toMatchObject({ status: 404 });
   });
 });
@@ -449,9 +475,11 @@ describe("validatePolicy", () => {
   });
 
   it("throws APIError with typed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "internal_error", message: "x" }, { status: 500 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "internal_error", message: "x" }, { status: 500 }),
+      ) as typeof fetch,
+    );
     await expect(validatePolicy("x")).rejects.toMatchObject({ status: 500 });
   });
 
@@ -470,20 +498,19 @@ describe("validatePolicy", () => {
 
 describe("simulatePolicy", () => {
   it("parses simulation response", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON(
-        { policy: "p", ruleSets: [] },
-        { status: 200 },
-      ),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () => mockJSON({ policy: "p", ruleSets: [] }, { status: 200 })) as typeof fetch,
+    );
     const out = await simulatePolicy("p", { containerID: "c" });
     expect(out.policy).toBe("p");
   });
 
   it("throws APIError with typed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "container_not_found", message: "nope" }, { status: 404 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "container_not_found", message: "nope" }, { status: 404 }),
+      ) as typeof fetch,
+    );
     await expect(simulatePolicy("p", {})).rejects.toMatchObject({
       code: "container_not_found",
     });
@@ -495,26 +522,28 @@ describe("simulatePolicy", () => {
   });
 
   it("throws schema_mismatch on malformed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ not: "right" }, { status: 200 }),
-    ) as typeof fetch);
+    installFetch(vi.fn(async () => mockJSON({ not: "right" }, { status: 200 })) as typeof fetch);
     await expect(simulatePolicy("p", {})).rejects.toMatchObject({ code: "schema_mismatch" });
   });
 });
 
 describe("savePolicy", () => {
   it("returns the parsed response on 2xx", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ name: "p", version: "v1", rules: 0 }, { status: 200 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ name: "p", version: "v1", rules: 0 }, { status: 200 }),
+      ) as typeof fetch,
+    );
     const out = await savePolicy("p", "dsl", "comment");
     expect(out.name).toBe("p");
   });
 
   it("throws APIError with typed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "invalid_id", message: "bad" }, { status: 400 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "invalid_id", message: "bad" }, { status: 400 }),
+      ) as typeof fetch,
+    );
     await expect(savePolicy("p", "d")).rejects.toMatchObject({ status: 400 });
   });
 
@@ -529,8 +558,7 @@ describe("savePolicy", () => {
     ) as typeof fetch;
     installFetch(fn);
     await savePolicy("p", "dsl-body", "note");
-    const call = (fn as unknown as { mock: { calls: [string, RequestInit][] } })
-      .mock.calls[0];
+    const call = (fn as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0];
     if (!call) throw new Error("fetch not called");
     expect(call[1].method).toBe("PUT");
     expect(String(call[1].body)).toContain("dsl-body");
@@ -540,9 +568,11 @@ describe("savePolicy", () => {
 
 describe("fetchAutogenProposals", () => {
   it("parses autogen list", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON([{ container_id: "c1", ports: [80] }], { status: 200 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON([{ container_id: "c1", ports: [80] }], { status: 200 }),
+      ) as typeof fetch,
+    );
     const out = await fetchAutogenProposals();
     expect(out[0]?.container_id).toBe("c1");
   });
@@ -557,20 +587,21 @@ describe("fetchAutogenProposals", () => {
 
 describe("approveAutogen", () => {
   it("returns parsed response", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON(
-        { mode: "labels", snippet: "stuff", container_id: "c1" },
-        { status: 200 },
-      ),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ mode: "labels", snippet: "stuff", container_id: "c1" }, { status: 200 }),
+      ) as typeof fetch,
+    );
     const out = await approveAutogen("c1", "labels");
     expect(out.mode).toBe("labels");
   });
 
   it("throws APIError on error", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "internal_error", message: "x" }, { status: 500 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "internal_error", message: "x" }, { status: 500 }),
+      ) as typeof fetch,
+    );
     await expect(approveAutogen("c", "policy")).rejects.toMatchObject({
       status: 500,
     });
@@ -584,9 +615,7 @@ describe("approveAutogen", () => {
   });
 
   it("throws schema_mismatch on malformed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ mode: "unknown" }, { status: 200 }),
-    ) as typeof fetch);
+    installFetch(vi.fn(async () => mockJSON({ mode: "unknown" }, { status: 200 })) as typeof fetch);
     await expect(approveAutogen("c", "labels")).rejects.toMatchObject({
       code: "schema_mismatch",
     });
@@ -605,9 +634,11 @@ describe("rejectAutogen", () => {
   });
 
   it("throws APIError with typed body", async () => {
-    installFetch(vi.fn(async () =>
-      mockJSON({ code: "container_not_found", message: "nope" }, { status: 404 }),
-    ) as typeof fetch);
+    installFetch(
+      vi.fn(async () =>
+        mockJSON({ code: "container_not_found", message: "nope" }, { status: 404 }),
+      ) as typeof fetch,
+    );
     await expect(rejectAutogen("c1")).rejects.toMatchObject({ status: 404 });
   });
 

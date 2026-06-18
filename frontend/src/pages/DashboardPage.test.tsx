@@ -9,9 +9,7 @@ vi.mock("recharts", () => {
   const SvgStub = ({ children }: { children?: React.ReactNode }) => (
     <svg data-testid="rechart-stub">{children}</svg>
   );
-  const Passthrough = ({ children }: { children?: React.ReactNode }) => (
-    <>{children}</>
-  );
+  const Passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
   const XAxis = ({ tickFormatter }: { tickFormatter?: (v: string) => string }) => (
     <div data-testid="xaxis-stub">
       {tickFormatter ? tickFormatter("2026-04-23T10:00:00Z") : null}
@@ -28,12 +26,8 @@ vi.mock("recharts", () => {
       <span>{labelFormatter ? labelFormatter("2026-04-23T10:00:00Z") : ""}</span>
       <span>{labelFormatter ? labelFormatter("") : ""}</span>
       <span>{labelFormatter ? labelFormatter(42) : ""}</span>
-      <span>
-        {formatter ? JSON.stringify(formatter(100, "accepted")) : ""}
-      </span>
-      <span>
-        {formatter ? JSON.stringify(formatter(50, "dropped")) : ""}
-      </span>
+      <span>{formatter ? JSON.stringify(formatter(100, "accepted")) : ""}</span>
+      <span>{formatter ? JSON.stringify(formatter(50, "dropped")) : ""}</span>
     </div>
   );
   const Legend = ({ formatter }: { formatter?: (v: unknown) => string }) => (
@@ -142,13 +136,9 @@ describe("DashboardPage", () => {
 
   it("renders the empty-state message when traffic is missing", async () => {
     const api = await import("@/lib/api");
-    vi.mocked(api.fetchStats).mockResolvedValue(
-      buildStats({ traffic: [] }),
-    );
+    vi.mocked(api.fetchStats).mockResolvedValue(buildStats({ traffic: [] }));
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/No traffic data yet/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/No traffic data yet/i)).toBeInTheDocument());
   });
 
   it("downsamples a long traffic series without crashing", async () => {

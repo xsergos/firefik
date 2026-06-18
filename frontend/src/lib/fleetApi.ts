@@ -34,7 +34,10 @@ const snapshotSchema = z.object({
     chain: z.string(),
     labels: z.record(z.string(), z.string()).optional(),
   }),
-  containers: z.array(containerStateSchema).nullable().transform((v) => v ?? []),
+  containers: z
+    .array(containerStateSchema)
+    .nullable()
+    .transform((v) => v ?? []),
   at: z.string(),
 });
 
@@ -87,7 +90,13 @@ async function postJSON<T>(path: string, body: unknown, schema: z.ZodSchema<T>):
 }
 
 export function fetchAgents(): Promise<FleetAgent[]> {
-  return getJSON("/api/agents", z.array(agentSchema).nullable().transform((v) => v ?? []));
+  return getJSON(
+    "/api/agents",
+    z
+      .array(agentSchema)
+      .nullable()
+      .transform((v) => v ?? []),
+  );
 }
 
 export function fetchAgent(id: string): Promise<FleetAgentDetail> {
@@ -123,7 +132,11 @@ export function createEnrollmentToken(
   agentID: string,
   ttlSeconds?: number,
 ): Promise<EnrollmentToken> {
-  return postJSON("/api/enrollment-tokens", { agent_id: agentID, ttl_seconds: ttlSeconds }, enrollmentTokenSchema);
+  return postJSON(
+    "/api/enrollment-tokens",
+    { agent_id: agentID, ttl_seconds: ttlSeconds },
+    enrollmentTokenSchema,
+  );
 }
 
 const fleetStatsSchema = z.object({
@@ -206,7 +219,10 @@ export function fetchAgentTokens(includeRevoked = false): Promise<AgentTokenReco
   const qs = includeRevoked ? "?include_revoked=1" : "";
   return getJSON(
     `/api/agent-tokens${qs}`,
-    z.array(agentTokenSchema).nullable().transform((v) => v ?? []),
+    z
+      .array(agentTokenSchema)
+      .nullable()
+      .transform((v) => v ?? []),
   );
 }
 

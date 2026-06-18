@@ -195,9 +195,7 @@ describe("fleetApi", () => {
 
   it("postJSON propagates body-text on non-2xx", async () => {
     installFetch(async () => new Response("nope", { status: 500 }));
-    await expect(
-      sendAgentCommand("h1", "apply", "c1"),
-    ).rejects.toThrow(/nope/);
+    await expect(sendAgentCommand("h1", "apply", "c1")).rejects.toThrow(/nope/);
   });
 
   it("getJSON falls back to status on empty error body", async () => {
@@ -241,14 +239,17 @@ describe("fleetApi", () => {
     let captured: { url: string; init?: RequestInit } | null = null;
     installFetch(async (input, init) => {
       captured = { url: input.toString(), init };
-      return mockJSON({
-        id: "t2",
-        name: "deploy",
-        description: "prod deploy",
-        issued_by: "admin",
-        issued_at: "2026-04-01T00:00:00Z",
-        token: "secret-token",
-      }, { status: 201 });
+      return mockJSON(
+        {
+          id: "t2",
+          name: "deploy",
+          description: "prod deploy",
+          issued_by: "admin",
+          issued_at: "2026-04-01T00:00:00Z",
+          token: "secret-token",
+        },
+        { status: 201 },
+      );
     });
     const out = await createAgentToken("deploy", "prod deploy");
     expect(out.token).toBe("secret-token");
@@ -281,9 +282,7 @@ describe("fleetApi", () => {
   });
 
   it("whoami parses session response", async () => {
-    installFetch(async () =>
-      mockJSON({ username: "admin", auth_kind: "session" }),
-    );
+    installFetch(async () => mockJSON({ username: "admin", auth_kind: "session" }));
     const out = await whoami();
     expect(out?.username).toBe("admin");
     expect(out?.auth_kind).toBe("session");
@@ -337,12 +336,15 @@ describe("fleetApi", () => {
     let captured: { url: string; init?: RequestInit } | null = null;
     installFetch(async (input, init) => {
       captured = { url: input.toString(), init };
-      return mockJSON({
-        token: "abc123",
-        agent_id: "host-a",
-        expires_at: "2026-05-08T00:00:00Z",
-        issued_at: "2026-05-07T23:45:00Z",
-      }, { status: 201 });
+      return mockJSON(
+        {
+          token: "abc123",
+          agent_id: "host-a",
+          expires_at: "2026-05-08T00:00:00Z",
+          issued_at: "2026-05-07T23:45:00Z",
+        },
+        { status: 201 },
+      );
     });
     const out = await createEnrollmentToken("host-a", 900);
     expect(out.token).toBe("abc123");

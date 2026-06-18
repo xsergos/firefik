@@ -45,9 +45,7 @@ export default function ContainersPage() {
   const deactivate = useDeactivateContainer();
   const bulk = useBulkContainers();
 
-  const selected = selectedId
-    ? containers?.find((c) => c.id === selectedId) ?? null
-    : null;
+  const selected = selectedId ? (containers?.find((c) => c.id === selectedId) ?? null) : null;
   const setSelected = (ctr: ContainerDTO | null) => setSelectedId(ctr?.id ?? null);
 
   useEffect(() => {
@@ -72,7 +70,10 @@ export default function ContainersPage() {
       e.preventDefault();
       if (e.key === "a") {
         setApplyingId(ctr.id);
-        apply.mutate({ id: ctr.id, agent_id: ctr.agent_id }, { onSettled: () => setApplyingId(null) });
+        apply.mutate(
+          { id: ctr.id, agent_id: ctr.agent_id },
+          { onSettled: () => setApplyingId(null) },
+        );
       } else if (ctr.firewallStatus === "active") {
         setConfirmDeactivate(ctr);
       }
@@ -128,12 +129,9 @@ export default function ContainersPage() {
     }
   };
 
-  const selectableRows = (filtered ?? []).filter(
-    (c) => c.firewallStatus !== "disabled",
-  );
+  const selectableRows = (filtered ?? []).filter((c) => c.firewallStatus !== "disabled");
   const allVisibleSelected =
-    selectableRows.length > 0 &&
-    selectableRows.every((c) => selectedIds.has(c.id));
+    selectableRows.length > 0 && selectableRows.every((c) => selectedIds.has(c.id));
   const selectedVisible = selectableRows.filter((c) => selectedIds.has(c.id));
   const bulkBusy = bulk.isPending;
 
@@ -231,12 +229,7 @@ export default function ContainersPage() {
           >
             {t("containers.disableSelected")}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={clearSelection}
-            aria-label="Clear selection"
-          >
+          <Button size="sm" variant="ghost" onClick={clearSelection} aria-label="Clear selection">
             {t("containers.clearSelection")}
           </Button>
         </div>
@@ -282,7 +275,10 @@ export default function ContainersPage() {
               onClick={() => setSelected(ctr)}
               onKeyDown={handleRowKey(ctr)}
             >
-              <TableCell onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <TableCell
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
                 {ctr.firewallStatus !== "disabled" ? (
                   <input
                     type="checkbox"
@@ -298,30 +294,20 @@ export default function ContainersPage() {
                 </TableCell>
               )}
               <TableCell className="font-medium">{ctr.name}</TableCell>
-              <TableCell className="font-mono text-xs text-muted-foreground">
-                {ctr.id}
-              </TableCell>
+              <TableCell className="font-mono text-xs text-muted-foreground">{ctr.id}</TableCell>
               <TableCell>
-                <Badge
-                  variant={ctr.status === "running" ? "default" : "secondary"}
-                >
+                <Badge variant={ctr.status === "running" ? "default" : "secondary"}>
                   {ctr.status}
                 </Badge>
               </TableCell>
               <TableCell>
                 {ctr.firewallStatus === "active" && (
-                  <Badge className="bg-green-500 hover:bg-green-600">
-                    Active
-                  </Badge>
+                  <Badge className="bg-green-500 hover:bg-green-600">Active</Badge>
                 )}
                 {ctr.firewallStatus === "inactive" && (
-                  <Badge className="bg-yellow-500 hover:bg-yellow-600">
-                    Inactive
-                  </Badge>
+                  <Badge className="bg-yellow-500 hover:bg-yellow-600">Inactive</Badge>
                 )}
-                {ctr.firewallStatus === "disabled" && (
-                  <Badge variant="outline">Disabled</Badge>
-                )}
+                {ctr.firewallStatus === "disabled" && <Badge variant="outline">Disabled</Badge>}
               </TableCell>
               <TableCell>
                 {ctr.firewallStatus !== "disabled" && (
@@ -329,7 +315,10 @@ export default function ContainersPage() {
                 )}
               </TableCell>
               <TableCell>{ctr.ruleSets?.length ?? 0}</TableCell>
-              <TableCell onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+              <TableCell
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
                 {ctr.firewallStatus !== "disabled" && (
                   <div className="flex gap-2">
                     <Button
@@ -339,14 +328,15 @@ export default function ContainersPage() {
                       disabled={applyingId !== null || deactivatingId !== null}
                       onClick={() => {
                         setApplyingId(ctr.id);
-                        apply.mutate({ id: ctr.id, agent_id: ctr.agent_id }, {
-                          onSettled: () => setApplyingId(null),
-                        });
+                        apply.mutate(
+                          { id: ctr.id, agent_id: ctr.agent_id },
+                          {
+                            onSettled: () => setApplyingId(null),
+                          },
+                        );
                       }}
                     >
-                      {applyingId === ctr.id && (
-                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                      )}
+                      {applyingId === ctr.id && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
                       Re-apply
                     </Button>
                     {ctr.firewallStatus === "active" && (
@@ -409,9 +399,9 @@ export default function ContainersPage() {
             <DialogTitle>Deactivate firewall?</DialogTitle>
             <DialogDescription>
               This removes all Firefik rules for
-              <span className="font-semibold"> {confirmDeactivate?.name}</span>.
-              Traffic restrictions will be dropped immediately. This cannot be
-              undone automatically — to restore, press Re-apply.
+              <span className="font-semibold"> {confirmDeactivate?.name}</span>. Traffic
+              restrictions will be dropped immediately. This cannot be undone automatically — to
+              restore, press Re-apply.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -425,9 +415,12 @@ export default function ContainersPage() {
                 const target = confirmDeactivate;
                 setConfirmDeactivate(null);
                 setDeactivatingId(target.id);
-                deactivate.mutate({ id: target.id, agent_id: target.agent_id }, {
-                  onSettled: () => setDeactivatingId(null),
-                });
+                deactivate.mutate(
+                  { id: target.id, agent_id: target.agent_id },
+                  {
+                    onSettled: () => setDeactivatingId(null),
+                  },
+                );
               }}
             >
               Deactivate

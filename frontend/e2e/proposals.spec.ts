@@ -1,7 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Autogen proposals page", () => {
-  test("lists proposals and exercises approve flow when data present", async ({ page, context }) => {
+  test("lists proposals and exercises approve flow when data present", async ({
+    page,
+    context,
+  }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => undefined);
 
     await page.goto("/proposals");
@@ -10,7 +13,10 @@ test.describe("Autogen proposals page", () => {
     const errorAlert = page.getByRole("alert");
     const state = await Promise.race([
       heading.waitFor({ state: "visible", timeout: 10_000 }).then(() => "ok"),
-      errorAlert.first().waitFor({ state: "visible", timeout: 10_000 }).then(() => "error"),
+      errorAlert
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => "error"),
     ]).catch(() => "timeout");
 
     if (state !== "ok") {
@@ -23,7 +29,10 @@ test.describe("Autogen proposals page", () => {
 
     const settled = await Promise.race([
       emptyCopy.waitFor({ state: "visible", timeout: 10_000 }).then(() => "empty"),
-      proposalItems.first().waitFor({ state: "visible", timeout: 10_000 }).then(() => "list"),
+      proposalItems
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => "list"),
     ]).catch(() => "timeout");
 
     if (settled !== "list") {
@@ -44,8 +53,14 @@ test.describe("Autogen proposals page", () => {
     const snippetSurface = page.locator("pre.whitespace-pre-wrap");
     const toastSurface = page.locator("[data-sonner-toast]");
     const resolution = await Promise.race([
-      snippetSurface.first().waitFor({ state: "visible", timeout: 10_000 }).then(() => "snippet"),
-      toastSurface.first().waitFor({ state: "visible", timeout: 10_000 }).then(() => "toast"),
+      snippetSurface
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => "snippet"),
+      toastSurface
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => "toast"),
     ]).catch(() => "timeout");
 
     expect(["snippet", "toast"]).toContain(resolution);

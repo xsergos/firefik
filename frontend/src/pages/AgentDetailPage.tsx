@@ -33,7 +33,10 @@ export default function AgentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id ?? "";
   const qc = useQueryClient();
-  const [pendingAction, setPendingAction] = useState<{ action: FleetCommandAction; container?: string } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{
+    action: FleetCommandAction;
+    container?: string;
+  } | null>(null);
 
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: queryKeys.agentSnapshot(id),
@@ -66,7 +69,9 @@ export default function AgentDetailPage() {
         </Link>
         <h1 className="text-2xl font-bold font-mono">{id}</h1>
         {data?.agent && (
-          <Badge variant={STATUS_VARIANT[data.agent.status] ?? "outline"}>{data.agent.status}</Badge>
+          <Badge variant={STATUS_VARIANT[data.agent.status] ?? "outline"}>
+            {data.agent.status}
+          </Badge>
         )}
       </div>
 
@@ -108,7 +113,9 @@ export default function AgentDetailPage() {
           <div>
             <h2 className="text-lg font-semibold pt-4 pb-2">Containers</h2>
             {!data.snapshot || data.snapshot.containers.length === 0 ? (
-              <p className="text-muted-foreground text-sm">No snapshot yet — agent has not reported containers.</p>
+              <p className="text-muted-foreground text-sm">
+                No snapshot yet — agent has not reported containers.
+              </p>
             ) : (
               <Table>
                 <TableHeader>
@@ -140,7 +147,9 @@ export default function AgentDetailPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={c.default_policy === "DROP" ? "destructive" : "secondary"}>
+                          <Badge
+                            variant={c.default_policy === "DROP" ? "destructive" : "secondary"}
+                          >
                             {c.default_policy}
                           </Badge>
                         </TableCell>

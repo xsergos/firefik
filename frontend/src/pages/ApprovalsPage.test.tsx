@@ -140,9 +140,7 @@ describe("ApprovalsPage", () => {
     expect(approveBtn).toBeEnabled();
     await user.click(approveBtn);
 
-    await waitFor(() =>
-      expect(api.approveApproval).toHaveBeenCalledWith("ap-pending", "alice"),
-    );
+    await waitFor(() => expect(api.approveApproval).toHaveBeenCalledWith("ap-pending", "alice"));
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Approval recorded"));
   });
 
@@ -174,9 +172,7 @@ describe("ApprovalsPage", () => {
     await user.type(screen.getByPlaceholderText("approver name"), "bob");
     await user.click(screen.getByRole("button", { name: "Approve" }));
 
-    await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("self-approval forbidden"),
-    );
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("self-approval forbidden"));
   });
 
   it("does NOT show approve/reject buttons on approved or rejected cards", async () => {
@@ -230,9 +226,7 @@ describe("ApprovalsPage", () => {
     });
     renderPage();
     await user.click(screen.getByRole("button", { name: "approved" }));
-    await waitFor(() =>
-      expect(screen.getByText("no-ts-policy")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText("no-ts-policy")).toBeInTheDocument());
     expect(screen.getByText(/approved by/i)).toBeInTheDocument();
   });
 

@@ -95,9 +95,7 @@ export default function HistoryPage() {
       </div>
 
       {isLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
-      {error instanceof Error && (
-        <div className="text-sm text-red-600">Error: {error.message}</div>
-      )}
+      {error instanceof Error && <div className="text-sm text-red-600">Error: {error.message}</div>}
 
       <div className="overflow-x-auto border rounded">
         <table className="w-full text-sm" aria-label="Audit history table">
@@ -123,16 +121,17 @@ export default function HistoryPage() {
                 )}
                 <td className="px-3 py-1.5">{ev.action}</td>
                 <td className="px-3 py-1.5">{ev.source}</td>
-                <td className="px-3 py-1.5">
-                  {ev.container_name || ev.container_id || "—"}
-                </td>
+                <td className="px-3 py-1.5">{ev.container_name || ev.container_id || "—"}</td>
                 <td className="px-3 py-1.5">{ev.rule_sets ?? 0}</td>
                 <td className="px-3 py-1.5">{ev.default_policy ?? "—"}</td>
               </tr>
             ))}
             {events.length === 0 && !isLoading && (
               <tr>
-                <td colSpan={isPanelMode ? 7 : 6} className="px-3 py-6 text-center text-muted-foreground">
+                <td
+                  colSpan={isPanelMode ? 7 : 6}
+                  className="px-3 py-6 text-center text-muted-foreground"
+                >
                   No events.
                 </td>
               </tr>

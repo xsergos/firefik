@@ -41,10 +41,7 @@ interface TableErrorProps {
 
 export function TableError({ label }: TableErrorProps) {
   return (
-    <div
-      role="alert"
-      className="py-10 text-center text-sm text-destructive"
-    >
+    <div role="alert" className="py-10 text-center text-sm text-destructive">
       {label}
     </div>
   );

@@ -145,9 +145,7 @@ describe("RulesPage", () => {
 
   it("falls back to a 'No rule sets' message when ruleSets is empty", async () => {
     const api = await import("@/lib/api");
-    vi.mocked(api.fetchRules).mockResolvedValue([
-      { ...baseEntry, ruleSets: [] },
-    ]);
+    vi.mocked(api.fetchRules).mockResolvedValue([{ ...baseEntry, ruleSets: [] }]);
     renderPage();
     await waitFor(() => expect(screen.getByText("No rule sets.")).toBeInTheDocument());
   });
@@ -156,16 +154,16 @@ describe("RulesPage", () => {
     const api = await import("@/lib/api");
     vi.mocked(api.fetchRules).mockResolvedValue([]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/No active firewall rules/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/No active firewall rules/i)).toBeInTheDocument());
   });
 
   it("renders the error state when fetchRules rejects", async () => {
     const api = await import("@/lib/api");
     vi.mocked(api.fetchRules).mockRejectedValue(new Error("boom"));
     renderPage();
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Failed to load rules/i));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/Failed to load rules/i),
+    );
   });
 
   it("groups entries by agent and renders host + container sections", async () => {
@@ -249,7 +247,13 @@ describe("RulesPage", () => {
         ...baseEntry,
         ruleSets: [
           { name: "web", ports: [80], allowlist: ["10.0.0.0/24"], blocklist: [], protocol: "tcp" },
-          { name: "db", ports: [5432], allowlist: ["172.16.0.0/16"], blocklist: [], protocol: "tcp" },
+          {
+            name: "db",
+            ports: [5432],
+            allowlist: ["172.16.0.0/16"],
+            blocklist: [],
+            protocol: "tcp",
+          },
         ],
       },
     ]);
@@ -299,9 +303,7 @@ describe("RulesPage", () => {
 
   it("renders host section with 'No host rules.' when no filter applied", async () => {
     const api = await import("@/lib/api");
-    vi.mocked(api.fetchRules).mockResolvedValue([
-      { ...baseEntry, agent_hostname: "alpha" },
-    ]);
+    vi.mocked(api.fetchRules).mockResolvedValue([{ ...baseEntry, agent_hostname: "alpha" }]);
     renderPage();
     await waitFor(() => expect(screen.getByText("alpha")).toBeInTheDocument());
     expect(screen.getByText("No host rules.")).toBeInTheDocument();
@@ -342,9 +344,7 @@ describe("RulesPage", () => {
     vi.mocked(api.fetchRules).mockResolvedValue([
       {
         ...baseEntry,
-        ruleSets: [
-          { name: "noop", ports: [80], allowlist: [], blocklist: [], protocol: "tcp" },
-        ],
+        ruleSets: [{ name: "noop", ports: [80], allowlist: [], blocklist: [], protocol: "tcp" }],
       },
     ]);
     renderPage();

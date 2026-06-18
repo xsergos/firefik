@@ -52,8 +52,9 @@ export default function FleetPage() {
         <TableError label="Could not connect to control plane." />
       ) : !data || data.length === 0 ? (
         <p className="text-muted-foreground">
-          No agents registered yet. Run <code className="text-xs bg-muted px-1 py-0.5 rounded">firefik-admin enroll</code>{" "}
-          on a host to add it to the fleet.
+          No agents registered yet. Run{" "}
+          <code className="text-xs bg-muted px-1 py-0.5 rounded">firefik-admin enroll</code> on a
+          host to add it to the fleet.
         </p>
       ) : (
         <Table>
@@ -71,7 +72,10 @@ export default function FleetPage() {
             {data.map((agent) => (
               <TableRow key={agent.instance_id}>
                 <TableCell className="font-mono">
-                  <Link to={`/fleet/${encodeURIComponent(agent.instance_id)}`} className="underline">
+                  <Link
+                    to={`/fleet/${encodeURIComponent(agent.instance_id)}`}
+                    className="underline"
+                  >
                     {agent.instance_id}
                   </Link>
                 </TableCell>

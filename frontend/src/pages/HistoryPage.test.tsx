@@ -123,9 +123,7 @@ describe("HistoryPage", () => {
     await waitFor(() => expect(screen.getByText("nginx")).toBeInTheDocument());
     const actionInput = screen.getByPlaceholderText(/apply \/ remove \/ drift/i);
     await user.type(actionInput, "nope-no-match");
-    await waitFor(() =>
-      expect(screen.getByText(/No events\./i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/No events\./i)).toBeInTheDocument());
   });
 
   it("toggles auto-refresh checkbox without crashing", async () => {
@@ -156,9 +154,7 @@ describe("HistoryPage", () => {
     const api = await import("@/lib/api");
     vi.mocked(api.fetchAuditHistory).mockRejectedValue(new Error("offline"));
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/Error: offline/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Error: offline/i)).toBeInTheDocument());
   });
 
   it("falls back to '—' for missing container metadata and zero rule-sets", async () => {
@@ -171,9 +167,7 @@ describe("HistoryPage", () => {
       },
     ]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/Showing 1 of 1 events/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Showing 1 of 1 events/i)).toBeInTheDocument());
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
   });
 
@@ -184,16 +178,12 @@ describe("HistoryPage", () => {
       { ts: "2026-04-23T10:05:00Z", action: "noop", source: "api" },
     ]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/Showing 1 of 1 events/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Showing 1 of 1 events/i)).toBeInTheDocument());
     const inputs = screen.getAllByRole("textbox");
     const containerInput = inputs[2];
     if (!containerInput) throw new Error("container filter input missing");
     await user.type(containerInput, "anything");
-    await waitFor(() =>
-      expect(screen.getByText(/Showing 0 of 1 events/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/Showing 0 of 1 events/i)).toBeInTheDocument());
   });
 
   it("renders the auto-refresh interval timer without breaking when toggled off", async () => {

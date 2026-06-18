@@ -13,10 +13,18 @@ test.describe("API failure recovery", () => {
     await page.goto("/rules");
 
     const errorAlert = page.getByRole("alert");
-    const errorBoundaryHint = page.getByText(/failed to load rules|something went wrong|try again/i);
+    const errorBoundaryHint = page.getByText(
+      /failed to load rules|something went wrong|try again/i,
+    );
     const surfaced = await Promise.race([
-      errorAlert.first().waitFor({ state: "visible", timeout: 15_000 }).then(() => "alert"),
-      errorBoundaryHint.first().waitFor({ state: "visible", timeout: 15_000 }).then(() => "hint"),
+      errorAlert
+        .first()
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "alert"),
+      errorBoundaryHint
+        .first()
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "hint"),
     ]).catch(() => "none");
 
     expect(["alert", "hint"]).toContain(surfaced);
@@ -30,7 +38,10 @@ test.describe("API failure recovery", () => {
     const recovered = await Promise.race([
       heading.waitFor({ state: "visible", timeout: 15_000 }).then(() => "heading"),
       emptyState.waitFor({ state: "visible", timeout: 15_000 }).then(() => "empty"),
-      errorAfterReload.first().waitFor({ state: "visible", timeout: 15_000 }).then(() => "error"),
+      errorAfterReload
+        .first()
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "error"),
     ]).catch(() => "none");
 
     if (recovered === "error" || recovered === "none") {
@@ -53,10 +64,18 @@ test.describe("API failure recovery", () => {
     await page.goto("/containers");
 
     const errorAlert = page.getByRole("alert");
-    const errorHint = page.getByText(/could not connect to backend|failed|something went wrong|try again/i);
+    const errorHint = page.getByText(
+      /could not connect to backend|failed|something went wrong|try again/i,
+    );
     const surfaced = await Promise.race([
-      errorAlert.first().waitFor({ state: "visible", timeout: 15_000 }).then(() => "alert"),
-      errorHint.first().waitFor({ state: "visible", timeout: 15_000 }).then(() => "hint"),
+      errorAlert
+        .first()
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "alert"),
+      errorHint
+        .first()
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "hint"),
     ]).catch(() => "none");
 
     expect(["alert", "hint"]).toContain(surfaced);
@@ -68,7 +87,10 @@ test.describe("API failure recovery", () => {
     const errorAfterReload = page.getByRole("alert");
     const recovered = await Promise.race([
       heading.waitFor({ state: "visible", timeout: 15_000 }).then(() => "heading"),
-      errorAfterReload.first().waitFor({ state: "visible", timeout: 15_000 }).then(() => "error"),
+      errorAfterReload
+        .first()
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => "error"),
     ]).catch(() => "none");
 
     if (recovered === "error" || recovered === "none") {

@@ -40,8 +40,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         <div role="alert" className="p-8 space-y-3">
           <p className="text-lg font-semibold text-destructive">Something went wrong.</p>
           <p className="text-sm text-muted-foreground">
-            The page failed to render. Reload to continue, or try again if the
-            error was transient.
+            The page failed to render. Reload to continue, or try again if the error was transient.
           </p>
           {this.state.error?.message && (
             <pre className="text-xs bg-muted p-2 rounded overflow-x-auto">

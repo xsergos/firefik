@@ -92,10 +92,7 @@ async function request<T>(
     });
   } catch (err) {
     clearTimeout(timeoutID);
-    if (
-      err instanceof DOMException && err.name === "AbortError" &&
-      !signal?.aborted
-    ) {
+    if (err instanceof DOMException && err.name === "AbortError" && !signal?.aborted) {
       throw new APIError(0, "timeout", "The request took too long.");
     }
     throw err;
@@ -190,7 +187,10 @@ export async function bulkContainerActions(
     body: JSON.stringify({ actions }),
   });
   if (!res.ok) {
-    const parsed = await res.json().then((b) => apiErrorSchema.safeParse(b)).catch(() => null);
+    const parsed = await res
+      .json()
+      .then((b) => apiErrorSchema.safeParse(b))
+      .catch(() => null);
     if (parsed && parsed.success) {
       const msg = userMessageFor(parsed.data.code, parsed.data.message);
       throw new APIError(res.status, parsed.data.code, msg, parsed.data.details);
@@ -200,7 +200,11 @@ export async function bulkContainerActions(
   const body: unknown = await res.json();
   const out = bulkResponseSchema.safeParse(body);
   if (!out.success) {
-    throw new APIError(res.status, "schema_mismatch", "Server returned an unexpected bulk payload.");
+    throw new APIError(
+      res.status,
+      "schema_mismatch",
+      "Server returned an unexpected bulk payload.",
+    );
   }
   return out.data;
 }
@@ -209,7 +213,10 @@ export function fetchPolicies(opts: { signal?: AbortSignal } = {}): Promise<Poli
   return request("/api/policies", policySummaryListSchema, opts);
 }
 
-export function fetchPolicy(name: string, opts: { signal?: AbortSignal } = {}): Promise<PolicyDetail> {
+export function fetchPolicy(
+  name: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<PolicyDetail> {
   return request(`/api/policies/${encodeURIComponent(name)}`, policyDetailSchema, opts);
 }
 
@@ -220,15 +227,24 @@ export async function validatePolicy(dsl: string): Promise<PolicyValidateRespons
     body: JSON.stringify({ dsl }),
   });
   if (!res.ok) {
-    const parsed = await res.json().then((b) => apiErrorSchema.safeParse(b)).catch(() => null);
+    const parsed = await res
+      .json()
+      .then((b) => apiErrorSchema.safeParse(b))
+      .catch(() => null);
     if (parsed && parsed.success) {
-      throw new APIError(res.status, parsed.data.code, userMessageFor(parsed.data.code, parsed.data.message), parsed.data.details);
+      throw new APIError(
+        res.status,
+        parsed.data.code,
+        userMessageFor(parsed.data.code, parsed.data.message),
+        parsed.data.details,
+      );
     }
     throw new APIError(res.status, "internal_error", GENERIC_ERROR);
   }
   const body: unknown = await res.json();
   const out = policyValidateResponseSchema.safeParse(body);
-  if (!out.success) throw new APIError(res.status, "schema_mismatch", "Unexpected validate response");
+  if (!out.success)
+    throw new APIError(res.status, "schema_mismatch", "Unexpected validate response");
   return out.data;
 }
 
@@ -242,28 +258,49 @@ export async function simulatePolicy(
     body: JSON.stringify(opts),
   });
   if (!res.ok) {
-    const parsed = await res.json().then((b) => apiErrorSchema.safeParse(b)).catch(() => null);
+    const parsed = await res
+      .json()
+      .then((b) => apiErrorSchema.safeParse(b))
+      .catch(() => null);
     if (parsed && parsed.success) {
-      throw new APIError(res.status, parsed.data.code, userMessageFor(parsed.data.code, parsed.data.message), parsed.data.details);
+      throw new APIError(
+        res.status,
+        parsed.data.code,
+        userMessageFor(parsed.data.code, parsed.data.message),
+        parsed.data.details,
+      );
     }
     throw new APIError(res.status, "internal_error", GENERIC_ERROR);
   }
   const body: unknown = await res.json();
   const out = policySimulateResponseSchema.safeParse(body);
-  if (!out.success) throw new APIError(res.status, "schema_mismatch", "Unexpected simulate response");
+  if (!out.success)
+    throw new APIError(res.status, "schema_mismatch", "Unexpected simulate response");
   return out.data;
 }
 
-export async function savePolicy(name: string, dsl: string, comment?: string): Promise<PolicySummary> {
+export async function savePolicy(
+  name: string,
+  dsl: string,
+  comment?: string,
+): Promise<PolicySummary> {
   const res = await fetch(`${BASE_URL}/api/policies/${encodeURIComponent(name)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     body: JSON.stringify({ dsl, comment: comment ?? "" }),
   });
   if (!res.ok) {
-    const parsed = await res.json().then((b) => apiErrorSchema.safeParse(b)).catch(() => null);
+    const parsed = await res
+      .json()
+      .then((b) => apiErrorSchema.safeParse(b))
+      .catch(() => null);
     if (parsed && parsed.success) {
-      throw new APIError(res.status, parsed.data.code, userMessageFor(parsed.data.code, parsed.data.message), parsed.data.details);
+      throw new APIError(
+        res.status,
+        parsed.data.code,
+        userMessageFor(parsed.data.code, parsed.data.message),
+        parsed.data.details,
+      );
     }
     throw new APIError(res.status, "internal_error", GENERIC_ERROR);
   }
@@ -293,15 +330,24 @@ export async function approveAutogen(
     },
   );
   if (!res.ok) {
-    const parsed = await res.json().then((b) => apiErrorSchema.safeParse(b)).catch(() => null);
+    const parsed = await res
+      .json()
+      .then((b) => apiErrorSchema.safeParse(b))
+      .catch(() => null);
     if (parsed && parsed.success) {
-      throw new APIError(res.status, parsed.data.code, userMessageFor(parsed.data.code, parsed.data.message), parsed.data.details);
+      throw new APIError(
+        res.status,
+        parsed.data.code,
+        userMessageFor(parsed.data.code, parsed.data.message),
+        parsed.data.details,
+      );
     }
     throw new APIError(res.status, "internal_error", GENERIC_ERROR);
   }
   const body: unknown = await res.json();
   const out = autogenApproveResponseSchema.safeParse(body);
-  if (!out.success) throw new APIError(res.status, "schema_mismatch", "Unexpected approve response");
+  if (!out.success)
+    throw new APIError(res.status, "schema_mismatch", "Unexpected approve response");
   return out.data;
 }
 
@@ -321,9 +367,17 @@ export async function rejectAutogen(
     },
   );
   if (!res.ok) {
-    const parsed = await res.json().then((b) => apiErrorSchema.safeParse(b)).catch(() => null);
+    const parsed = await res
+      .json()
+      .then((b) => apiErrorSchema.safeParse(b))
+      .catch(() => null);
     if (parsed && parsed.success) {
-      throw new APIError(res.status, parsed.data.code, userMessageFor(parsed.data.code, parsed.data.message), parsed.data.details);
+      throw new APIError(
+        res.status,
+        parsed.data.code,
+        userMessageFor(parsed.data.code, parsed.data.message),
+        parsed.data.details,
+      );
     }
     throw new APIError(res.status, "internal_error", GENERIC_ERROR);
   }
@@ -337,7 +391,10 @@ async function rawPOST(path: string, body?: unknown): Promise<void> {
   }
   const res = await fetch(`${BASE_URL}${path}`, init);
   if (!res.ok) {
-    const parsed = await res.json().then((b) => apiErrorSchema.safeParse(b)).catch(() => null);
+    const parsed = await res
+      .json()
+      .then((b) => apiErrorSchema.safeParse(b))
+      .catch(() => null);
     if (parsed && parsed.success) {
       const msg = userMessageFor(parsed.data.code, parsed.data.message);
       throw new APIError(res.status, parsed.data.code, msg, parsed.data.details);

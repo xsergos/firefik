@@ -8,7 +8,10 @@ test.describe("Policies page", () => {
     const errorAlert = page.getByRole("alert");
     const state = await Promise.race([
       heading.waitFor({ state: "visible", timeout: 10_000 }).then(() => "ok"),
-      errorAlert.first().waitFor({ state: "visible", timeout: 10_000 }).then(() => "error"),
+      errorAlert
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => "error"),
     ]).catch(() => "timeout");
 
     if (state !== "ok") {
@@ -47,13 +50,16 @@ test.describe("Policies page", () => {
     }
 
     await editor.click();
-    await page.keyboard.type("\nallow if proto == \"tcp\" and port == 8080\n");
+    await page.keyboard.type('\nallow if proto == "tcp" and port == 8080\n');
 
     const validationOk = page.getByText(/syntax ok/i);
     const validationErr = page.locator("text=/✗|✘/");
     await Promise.race([
       validationOk.waitFor({ state: "visible", timeout: 5_000 }).catch(() => null),
-      validationErr.first().waitFor({ state: "visible", timeout: 5_000 }).catch(() => null),
+      validationErr
+        .first()
+        .waitFor({ state: "visible", timeout: 5_000 })
+        .catch(() => null),
     ]);
 
     await simulateButton.click();
@@ -64,7 +70,10 @@ test.describe("Policies page", () => {
     });
     const surfaced = await Promise.race([
       simulationHeading.waitFor({ state: "visible", timeout: 10_000 }).then(() => "ok"),
-      simulateError.first().waitFor({ state: "visible", timeout: 10_000 }).then(() => "error"),
+      simulateError
+        .first()
+        .waitFor({ state: "visible", timeout: 10_000 })
+        .then(() => "error"),
     ]).catch(() => "timeout");
 
     expect(["ok", "error"]).toContain(surfaced);

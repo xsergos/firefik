@@ -106,17 +106,13 @@ describe("FleetPage", () => {
     const api = await import("@/lib/fleetApi");
     vi.mocked(api.fetchAgents).mockResolvedValue([]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/No agents registered yet/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/No agents registered yet/i)).toBeInTheDocument());
   });
 
   it("renders an error state when the API rejects", async () => {
     const api = await import("@/lib/fleetApi");
     vi.mocked(api.fetchAgents).mockRejectedValue(new Error("boom"));
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent(/Could not connect/i),
-    );
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(/Could not connect/i));
   });
 });

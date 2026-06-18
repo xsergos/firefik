@@ -70,10 +70,9 @@ export default function AgentTokensPage() {
       <div>
         <h1 className="text-2xl font-bold">Agent tokens</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Long-lived bearer tokens that agents present on the gRPC stream.
-          Plaintext is shown <strong>once</strong> at creation — copy it
-          immediately. Revoke individual tokens here when a host is decommissioned
-          or rotated.
+          Long-lived bearer tokens that agents present on the gRPC stream. Plaintext is shown{" "}
+          <strong>once</strong> at creation — copy it immediately. Revoke individual tokens here
+          when a host is decommissioned or rotated.
         </p>
       </div>
 
@@ -100,10 +99,7 @@ export default function AgentTokensPage() {
           </label>
         </div>
         <div>
-          <Button
-            disabled={!name.trim() || create.isPending}
-            onClick={() => create.mutate()}
-          >
+          <Button disabled={!name.trim() || create.isPending} onClick={() => create.mutate()}>
             {create.isPending ? "Issuing…" : "Issue token"}
           </Button>
         </div>
@@ -199,7 +195,11 @@ export default function AgentTokensPage() {
                           variant="destructive"
                           disabled={revoke.isPending}
                           onClick={() => {
-                            if (window.confirm(`Revoke token "${t.name}"? Agents using it will fail authentication.`)) {
+                            if (
+                              window.confirm(
+                                `Revoke token "${t.name}"? Agents using it will fail authentication.`,
+                              )
+                            ) {
                               revoke.mutate(t.id);
                             }
                           }}

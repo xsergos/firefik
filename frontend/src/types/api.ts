@@ -36,7 +36,10 @@ export const containerSchema = z.object({
   rule_set_count: z.number().optional(),
 });
 
-export const containerListSchema = z.array(containerSchema).nullable().transform((v) => v ?? []);
+export const containerListSchema = z
+  .array(containerSchema)
+  .nullable()
+  .transform((v) => v ?? []);
 
 export const logEntrySchema = z.object({
   ts: z.string(),
@@ -67,7 +70,10 @@ export const ruleEntrySchema = z.object({
   rule_set_count: z.number().optional(),
 });
 
-export const ruleEntryListSchema = z.array(ruleEntrySchema).nullable().transform((v) => v ?? []);
+export const ruleEntryListSchema = z
+  .array(ruleEntrySchema)
+  .nullable()
+  .transform((v) => v ?? []);
 
 export const statsResponseSchema = z.object({
   containers: z.object({
@@ -135,7 +141,10 @@ export const policySummarySchema = z.object({
   sha: z.string().optional(),
   committedAt: z.string().optional(),
 });
-export const policySummaryListSchema = z.array(policySummarySchema).nullable().transform((v) => v ?? []);
+export const policySummaryListSchema = z
+  .array(policySummarySchema)
+  .nullable()
+  .transform((v) => v ?? []);
 export type PolicySummary = z.infer<typeof policySummarySchema>;
 
 export const policyDetailSchema = z.object({
@@ -183,7 +192,10 @@ export const autogenProposalSchema = z.object({
   agent_hostname: z.string().optional(),
   updated_at: z.string().optional(),
 });
-export const autogenProposalListSchema = z.array(autogenProposalSchema).nullable().transform((v) => v ?? []);
+export const autogenProposalListSchema = z
+  .array(autogenProposalSchema)
+  .nullable()
+  .transform((v) => v ?? []);
 export type AutogenProposal = z.infer<typeof autogenProposalSchema>;
 
 export const autogenApproveResponseSchema = z.object({
@@ -208,5 +220,8 @@ export const auditHistoryEventSchema = z.object({
   agent_id: z.string().optional(),
   agent_hostname: z.string().optional(),
 });
-export const auditHistoryListSchema = z.array(auditHistoryEventSchema).nullable().transform((v) => v ?? []);
+export const auditHistoryListSchema = z
+  .array(auditHistoryEventSchema)
+  .nullable()
+  .transform((v) => v ?? []);
 export type AuditHistoryEvent = z.infer<typeof auditHistoryEventSchema>;

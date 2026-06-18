@@ -87,9 +87,10 @@ services:
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Create a one-time enrollment token, then paste the bash snippet on the new host. The agent will exchange
-        the token for a short-lived mTLS client cert via the embedded mini-CA, then connect to the control plane
-        via gRPC and self-register. Token is single-use and expires in the chosen TTL.
+        Create a one-time enrollment token, then paste the bash snippet on the new host. The agent
+        will exchange the token for a short-lived mTLS client cert via the embedded mini-CA, then
+        connect to the control plane via gRPC and self-register. Token is single-use and expires in
+        the chosen TTL.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -103,9 +104,7 @@ services:
             className="border border-input bg-background text-foreground placeholder:text-muted-foreground px-2 py-1 rounded text-sm w-full font-mono"
           />
           {!validInstance && (
-            <span className="text-xs text-destructive">
-              Must match [a-z0-9-]{`{3,63}`}
-            </span>
+            <span className="text-xs text-destructive">Must match [a-z0-9-]{`{3,63}`}</span>
           )}
         </Field>
 
@@ -115,7 +114,9 @@ services:
             min={1}
             max={1440}
             value={ttlMinutes}
-            onChange={(e) => setTtlMinutes(Math.max(1, parseInt(e.target.value, 10) || DEFAULT_TTL_MINUTES))}
+            onChange={(e) =>
+              setTtlMinutes(Math.max(1, parseInt(e.target.value, 10) || DEFAULT_TTL_MINUTES))
+            }
             className="border border-input bg-background text-foreground placeholder:text-muted-foreground px-2 py-1 rounded text-sm w-full font-mono"
           />
         </Field>
@@ -153,7 +154,10 @@ services:
         </Button>
         {issued && (
           <span className="text-sm text-muted-foreground">
-            token: <code className="text-xs bg-muted px-1 py-0.5 rounded">{issued.token.slice(0, 12)}…</code>{" "}
+            token:{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">
+              {issued.token.slice(0, 12)}…
+            </code>{" "}
             • expires in {expiresIn}
           </span>
         )}
@@ -163,26 +167,57 @@ services:
         <>
           <Section
             title="Step 1 — Run on the new host (root)"
-            action={<Button size="sm" variant="outline" onClick={() => copy(oneLiner, "Bash one-liner")}>Copy</Button>}
+            action={
+              <Button size="sm" variant="outline" onClick={() => copy(oneLiner, "Bash one-liner")}>
+                Copy
+              </Button>
+            }
           >
-            <pre className="bg-muted rounded p-3 text-xs overflow-auto font-mono whitespace-pre">{oneLiner}</pre>
+            <pre className="bg-muted rounded p-3 text-xs overflow-auto font-mono whitespace-pre">
+              {oneLiner}
+            </pre>
           </Section>
 
           <Section
             title="Step 2 — Boot the agent container"
-            action={<Button size="sm" variant="outline" onClick={() => copy(composeSnippet, "Compose snippet")}>Copy</Button>}
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => copy(composeSnippet, "Compose snippet")}
+              >
+                Copy
+              </Button>
+            }
           >
-            <pre className="bg-muted rounded p-3 text-xs overflow-auto font-mono whitespace-pre">{composeSnippet}</pre>
+            <pre className="bg-muted rounded p-3 text-xs overflow-auto font-mono whitespace-pre">
+              {composeSnippet}
+            </pre>
           </Section>
 
           <Section title="What happens next">
             <ul className="text-sm space-y-1 list-disc pl-5">
-              <li>Step 1 consumes the token (single-use) and writes mTLS cert + key + CA bundle to <code>/etc/firefik/</code>.</li>
+              <li>
+                Step 1 consumes the token (single-use) and writes mTLS cert + key + CA bundle to{" "}
+                <code>/etc/firefik/</code>.
+              </li>
               <li>Step 2 starts the agent which dials CP gRPC and self-registers.</li>
-              <li>The new host appears in <Link to="/fleet" className="underline">/fleet</Link> within ~30s. Status:{" "}
-                <Badge variant="default" className="text-xs">healthy</Badge>{" "}
-                <Badge variant="secondary" className="text-xs">stale</Badge>{" "}
-                <Badge variant="destructive" className="text-xs">dead</Badge>.
+              <li>
+                The new host appears in{" "}
+                <Link to="/fleet" className="underline">
+                  /fleet
+                </Link>{" "}
+                within ~30s. Status:{" "}
+                <Badge variant="default" className="text-xs">
+                  healthy
+                </Badge>{" "}
+                <Badge variant="secondary" className="text-xs">
+                  stale
+                </Badge>{" "}
+                <Badge variant="destructive" className="text-xs">
+                  dead
+                </Badge>
+                .
               </li>
               <li>Token expires automatically; re-issue here if needed.</li>
             </ul>
@@ -200,7 +235,15 @@ function formatExpiresIn(issued: EnrollmentToken | null): string {
   return `${Math.max(1, Math.round(ms / 60_000))} min`;
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1">
       <label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</label>

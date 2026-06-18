@@ -22,11 +22,14 @@ function renderPage() {
       mutations: { retry: false },
     },
   });
-  return { qc, ...render(
-    <QueryClientProvider client={qc}>
-      <TemplatesPage />
-    </QueryClientProvider>,
-  ) };
+  return {
+    qc,
+    ...render(
+      <QueryClientProvider client={qc}>
+        <TemplatesPage />
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 const tplA: PolicyTemplate = {
@@ -112,10 +115,7 @@ describe("TemplatesPage", () => {
     await user.type(screen.getByPlaceholderText("template-name"), "new-tpl");
     expect(publishBtn).toBeDisabled();
 
-    await user.type(
-      screen.getByPlaceholderText(/policy DSL body/i),
-      "policy body content",
-    );
+    await user.type(screen.getByPlaceholderText(/policy DSL body/i), "policy body content");
     expect(publishBtn).toBeEnabled();
   });
 
@@ -129,10 +129,7 @@ describe("TemplatesPage", () => {
     await waitFor(() => expect(screen.getByText("web-allow")).toBeInTheDocument());
 
     await user.type(screen.getByPlaceholderText("template-name"), "new-tpl");
-    await user.type(
-      screen.getByPlaceholderText(/policy DSL body/i),
-      "policy body content",
-    );
+    await user.type(screen.getByPlaceholderText(/policy DSL body/i), "policy body content");
     await user.click(screen.getByRole("button", { name: /^Publish$/ }));
 
     await waitFor(() =>
@@ -154,10 +151,7 @@ describe("TemplatesPage", () => {
     await waitFor(() => expect(screen.getByText("web-allow")).toBeInTheDocument());
 
     await user.type(screen.getByPlaceholderText("template-name"), "new-tpl");
-    await user.type(
-      screen.getByPlaceholderText(/policy DSL body/i),
-      "policy body content",
-    );
+    await user.type(screen.getByPlaceholderText(/policy DSL body/i), "policy body content");
     await user.click(screen.getByRole("button", { name: /^Publish$/ }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("forbidden"));

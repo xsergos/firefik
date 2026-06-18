@@ -147,7 +147,9 @@ export default function PoliciesPage() {
           </button>
           <hr className="my-2" />
           {list.isLoading && <p className="px-2 text-muted-foreground">Loading…</p>}
-          {list.data?.length === 0 && <p className="px-2 text-muted-foreground">No saved policies.</p>}
+          {list.data?.length === 0 && (
+            <p className="px-2 text-muted-foreground">No saved policies.</p>
+          )}
           {list.data?.map((p) => (
             <button
               key={p.name}
@@ -244,10 +246,14 @@ function ValidationPanel({ validation }: { validation: PolicyValidateResponse | 
   return (
     <div className="text-xs space-y-1">
       {validation.errors?.map((e, i) => (
-        <div key={`e-${i}`} className="text-destructive">✗ {e}</div>
+        <div key={`e-${i}`} className="text-destructive">
+          ✗ {e}
+        </div>
       ))}
       {validation.warnings?.map((w, i) => (
-        <div key={`w-${i}`} className="text-amber-600">! {w}</div>
+        <div key={`w-${i}`} className="text-amber-600">
+          ! {w}
+        </div>
       ))}
     </div>
   );
@@ -269,10 +275,14 @@ function SimulatePanel({ sim }: { sim: PolicySimulateResponse }) {
         </p>
       )}
       {sim.errors?.map((e, i) => (
-        <div key={`se-${i}`} className="text-xs text-destructive">✗ {e}</div>
+        <div key={`se-${i}`} className="text-xs text-destructive">
+          ✗ {e}
+        </div>
       ))}
       {sim.warnings?.map((w, i) => (
-        <div key={`sw-${i}`} className="text-xs text-amber-600">! {w}</div>
+        <div key={`sw-${i}`} className="text-xs text-amber-600">
+          ! {w}
+        </div>
       ))}
       {sim.ruleSets.length === 0 ? (
         <p className="text-muted-foreground text-xs">No rule-sets compiled.</p>

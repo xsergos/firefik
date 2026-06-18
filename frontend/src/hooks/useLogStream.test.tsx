@@ -96,10 +96,7 @@ describe("useLogStream", () => {
       );
     });
 
-    expect(toast.warning).toHaveBeenCalledWith(
-      expect.stringContaining("7"),
-      expect.anything(),
-    );
+    expect(toast.warning).toHaveBeenCalledWith(expect.stringContaining("7"), expect.anything());
   });
 
   it("emits an info toast on server_shutdown", () => {

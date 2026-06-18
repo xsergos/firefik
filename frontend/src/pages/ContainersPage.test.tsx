@@ -25,9 +25,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 vi.mock("@/lib/containerYaml", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/containerYaml")>(
-    "@/lib/containerYaml",
-  );
+  const actual = await vi.importActual<typeof import("@/lib/containerYaml")>("@/lib/containerYaml");
   return {
     ...actual,
     downloadTextFile: vi.fn(),
@@ -185,9 +183,7 @@ describe("ContainersPage bulk selection", () => {
     expect(await screen.findByText(/Disable 2 container/i)).toBeInTheDocument();
     expect(api.bulkContainerActions).not.toHaveBeenCalled();
 
-    const dialogButton = screen
-      .getAllByRole("button", { name: /Disable selected/i })
-      .at(-1);
+    const dialogButton = screen.getAllByRole("button", { name: /Disable selected/i }).at(-1);
     if (!dialogButton) throw new Error("confirm bulk disable button missing");
     await user.click(dialogButton);
 
@@ -302,13 +298,9 @@ describe("ContainersPage row actions", () => {
     const user = userEvent.setup();
     const api = await import("@/lib/api");
     const yamlMod = await import("@/lib/containerYaml");
-    vi.mocked(api.fetchContainers).mockResolvedValue([
-      { ...activeCtr, name: "" },
-    ]);
+    vi.mocked(api.fetchContainers).mockResolvedValue([{ ...activeCtr, name: "" }]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(activeCtr.id.slice(0, 12))).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(activeCtr.id.slice(0, 12))).toBeInTheDocument());
 
     const row = screen.getByLabelText(/Open details for/i);
     row.focus();
@@ -362,9 +354,7 @@ describe("ContainersPage failure modes", () => {
     vi.mocked(api.fetchContainers).mockRejectedValue(new Error("backend down"));
     renderPage();
     await waitFor(() =>
-      expect(
-        screen.getByText(/Could not connect to backend/i),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/Could not connect to backend/i)).toBeInTheDocument(),
     );
   });
 
@@ -381,9 +371,7 @@ describe("ContainersPage failure modes", () => {
     const api = await import("@/lib/api");
     vi.mocked(api.fetchContainers).mockResolvedValue([]);
     renderPage();
-    await waitFor(() =>
-      expect(screen.getByText(/No containers yet/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/No containers yet/i)).toBeInTheDocument());
   });
 
   it("toggles a container off when its row checkbox is clicked twice", async () => {
@@ -468,9 +456,7 @@ describe("ContainersPage detail rendering", () => {
     await user.click(screen.getByLabelText("Deactivate firewall for nginx"));
     await screen.findByText("Deactivate firewall?");
     await user.keyboard("{Escape}");
-    await waitFor(() =>
-      expect(screen.queryByText("Deactivate firewall?")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByText("Deactivate firewall?")).not.toBeInTheDocument());
   });
 });
 

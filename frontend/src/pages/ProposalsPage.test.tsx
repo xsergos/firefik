@@ -73,14 +73,10 @@ const approvedT: AutogenProposal = {
 
 beforeEach(async () => {
   const api = await import("@/lib/api");
-  vi.mocked(api.fetchAutogenProposals).mockResolvedValue([
-    pendingHigh,
-    pendingMod,
-    approvedT,
-  ]);
+  vi.mocked(api.fetchAutogenProposals).mockResolvedValue([pendingHigh, pendingMod, approvedT]);
   vi.mocked(api.approveAutogen).mockResolvedValue({
     mode: "labels",
-    snippet: "labels:\n  firefik.enable: \"true\"",
+    snippet: 'labels:\n  firefik.enable: "true"',
     container_id: pendingHigh.container_id,
     ports: pendingHigh.ports,
     peers: pendingHigh.peers,
@@ -99,9 +95,7 @@ describe("ProposalsPage", () => {
       expect(screen.getByText(pendingHigh.container_id.slice(0, 12))).toBeInTheDocument(),
     );
     expect(screen.getByText(pendingMod.container_id.slice(0, 12))).toBeInTheDocument();
-    expect(
-      screen.queryByText(approvedT.container_id.slice(0, 12)),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(approvedT.container_id.slice(0, 12))).not.toBeInTheDocument();
   });
 
   it("switches to the approved bucket when the filter button is pressed", async () => {
@@ -115,9 +109,7 @@ describe("ProposalsPage", () => {
     await waitFor(() =>
       expect(screen.getByText(approvedT.container_id.slice(0, 12))).toBeInTheDocument(),
     );
-    expect(
-      screen.queryByText(pendingHigh.container_id.slice(0, 12)),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(pendingHigh.container_id.slice(0, 12))).not.toBeInTheDocument();
   });
 
   it("shows an empty bucket message when no proposals match the filter", async () => {
@@ -142,11 +134,13 @@ describe("ProposalsPage", () => {
     await user.click(screen.getByRole("button", { name: /Approve → labels/i }));
     const api = await import("@/lib/api");
     await waitFor(() =>
-      expect(api.approveAutogen).toHaveBeenCalledWith(pendingHigh.container_id, "labels", undefined),
+      expect(api.approveAutogen).toHaveBeenCalledWith(
+        pendingHigh.container_id,
+        "labels",
+        undefined,
+      ),
     );
-    await waitFor(() =>
-      expect(screen.getByText(/docker-compose labels/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/docker-compose labels/i)).toBeInTheDocument());
   });
 
   it("approves as policy when the policy button is pressed", async () => {
@@ -164,7 +158,11 @@ describe("ProposalsPage", () => {
 
     await user.click(screen.getByRole("button", { name: /Approve → policy snippet/i }));
     await waitFor(() =>
-      expect(api.approveAutogen).toHaveBeenCalledWith(pendingHigh.container_id, "policy", undefined),
+      expect(api.approveAutogen).toHaveBeenCalledWith(
+        pendingHigh.container_id,
+        "policy",
+        undefined,
+      ),
     );
     await waitFor(() => expect(screen.getByText(/policy DSL/i)).toBeInTheDocument());
   });
@@ -179,7 +177,11 @@ describe("ProposalsPage", () => {
     await user.click(screen.getByRole("button", { name: "Reject" }));
     const api = await import("@/lib/api");
     await waitFor(() =>
-      expect(api.rejectAutogen).toHaveBeenCalledWith(pendingHigh.container_id, undefined, undefined),
+      expect(api.rejectAutogen).toHaveBeenCalledWith(
+        pendingHigh.container_id,
+        undefined,
+        undefined,
+      ),
     );
   });
 

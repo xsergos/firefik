@@ -29,7 +29,8 @@ export default function ApprovalsPage() {
   });
 
   const approve = useMutation({
-    mutationFn: ({ id, approver }: { id: string; approver: string }) => approveApproval(id, approver),
+    mutationFn: ({ id, approver }: { id: string; approver: string }) =>
+      approveApproval(id, approver),
     onSuccess: () => {
       toast.success("Approval recorded");
       qc.invalidateQueries({ queryKey: ["approvals"] });
@@ -117,7 +118,9 @@ function ApprovalCard({
           {new Date(approval.requested_at).toLocaleString()}
         </span>
       </div>
-      <pre className="max-h-40 overflow-auto rounded bg-muted p-2 text-xs">{approval.proposed_body}</pre>
+      <pre className="max-h-40 overflow-auto rounded bg-muted p-2 text-xs">
+        {approval.proposed_body}
+      </pre>
       {approval.status === "pending" && (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <input
@@ -134,7 +137,11 @@ function ApprovalCard({
             value={comment}
             onChange={(e) => setComment(e.target.value)}
           />
-          <Button size="sm" disabled={!approver.trim() || busy} onClick={() => onApprove(approver.trim())}>
+          <Button
+            size="sm"
+            disabled={!approver.trim() || busy}
+            onClick={() => onApprove(approver.trim())}
+          >
             Approve
           </Button>
           <Button

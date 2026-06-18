@@ -1,14 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchStats } from "@/lib/api";
 import { fetchFleetStats } from "@/lib/fleetApi";
@@ -57,12 +49,11 @@ function useFleetStats() {
 
 function FleetDashboard() {
   const { data, isLoading, isError } = useFleetStats();
-  const fleetTraffic = useMemo(
-    () => (data?.traffic ? downsample(data.traffic) : []),
-    [data],
-  );
+  const fleetTraffic = useMemo(() => (data?.traffic ? downsample(data.traffic) : []), [data]);
   if (isError) {
-    return <TableError label="Failed to load fleet stats. Make sure the control plane is running." />;
+    return (
+      <TableError label="Failed to load fleet stats. Make sure the control plane is running." />
+    );
   }
   const a = data?.agents ?? { total: 0, healthy: 0, stale: 0, dead: 0, unknown: 0 };
   const c = data?.containers ?? { total: 0, running: 0, enabled: 0 };
@@ -110,14 +101,28 @@ function FleetDashboard() {
                 />
                 <YAxis tick={{ fontSize: 11 }} width={32} />
                 <Tooltip
-                  labelFormatter={(v) => (typeof v === "string" && v ? new Date(v).toLocaleTimeString() : "")}
+                  labelFormatter={(v) =>
+                    typeof v === "string" && v ? new Date(v).toLocaleTimeString() : ""
+                  }
                   formatter={(value, name) => [value, name === "accepted" ? "Accepted" : "Dropped"]}
                 />
                 <Legend formatter={(v) => (v === "accepted" ? "Accepted" : "Dropped")} />
-                <Area type="monotone" dataKey="accepted" stroke="#22c55e" strokeWidth={2}
-                      fill="url(#colorFleetAccepted)" dot={false} />
-                <Area type="monotone" dataKey="dropped" stroke="#ef4444" strokeWidth={2}
-                      fill="url(#colorFleetDropped)" dot={false} />
+                <Area
+                  type="monotone"
+                  dataKey="accepted"
+                  stroke="#22c55e"
+                  strokeWidth={2}
+                  fill="url(#colorFleetAccepted)"
+                  dot={false}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="dropped"
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  fill="url(#colorFleetDropped)"
+                  dot={false}
+                />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
@@ -141,15 +146,10 @@ export default function DashboardPage() {
 function SingleAgentDashboard() {
   const { data, isLoading, isError } = useStats();
 
-  const traffic = useMemo(
-    () => (data?.traffic ? downsample(data.traffic) : []),
-    [data],
-  );
+  const traffic = useMemo(() => (data?.traffic ? downsample(data.traffic) : []), [data]);
 
   if (isError)
-    return (
-      <TableError label="Failed to load dashboard stats. Make sure the backend is running." />
-    );
+    return <TableError label="Failed to load dashboard stats. Make sure the backend is running." />;
 
   const total = data?.containers.total ?? 0;
   const running = data?.containers.running ?? 0;
@@ -187,13 +187,17 @@ function SingleAgentDashboard() {
                 </defs>
                 <XAxis
                   dataKey="ts"
-                  tickFormatter={(v: string) => new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  tickFormatter={(v: string) =>
+                    new Date(v).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  }
                   tick={{ fontSize: 11 }}
                   minTickGap={40}
                 />
                 <YAxis tick={{ fontSize: 11 }} width={32} />
                 <Tooltip
-                  labelFormatter={(v) => typeof v === "string" && v ? new Date(v).toLocaleTimeString() : ""}
+                  labelFormatter={(v) =>
+                    typeof v === "string" && v ? new Date(v).toLocaleTimeString() : ""
+                  }
                   formatter={(value, name) => [value, name === "accepted" ? "Accepted" : "Dropped"]}
                 />
                 <Legend formatter={(v) => (v === "accepted" ? "Accepted" : "Dropped")} />

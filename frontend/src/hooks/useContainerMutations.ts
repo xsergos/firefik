@@ -74,9 +74,7 @@ export function useBulkContainers() {
         queryClient.invalidateQueries({ queryKey: key });
       }
       if (resp.summary.failed === 0) {
-        toast.success(
-          `Bulk: ${resp.summary.applied} applied, ${resp.summary.disabled} disabled`,
-        );
+        toast.success(`Bulk: ${resp.summary.applied} applied, ${resp.summary.disabled} disabled`);
       } else {
         toast.warning(
           `Bulk: ${actions.length - resp.summary.failed}/${actions.length} succeeded (${resp.summary.failed} failed)`,

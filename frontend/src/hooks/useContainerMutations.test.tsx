@@ -127,9 +127,7 @@ describe("useDeactivateContainer", () => {
       await expect(result.current.mutateAsync("abc")).rejects.toBe(err);
     });
 
-    expect(toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("Could not deactivate."),
-    );
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Could not deactivate."));
   });
 });
 
@@ -172,9 +170,7 @@ describe("useBulkContainers", () => {
       ]);
     });
 
-    expect(toast.warning).toHaveBeenCalledWith(
-      "Bulk: 1/3 succeeded (2 failed)",
-    );
+    expect(toast.warning).toHaveBeenCalledWith("Bulk: 1/3 succeeded (2 failed)");
   });
 
   it("surfaces APIError via toast when the bulk request itself fails", async () => {
@@ -185,14 +181,10 @@ describe("useBulkContainers", () => {
 
     const { result } = renderHook(() => useBulkContainers(), { wrapper: Wrapper });
     await act(async () => {
-      await expect(
-        result.current.mutateAsync([{ id: "a", action: "apply" }]),
-      ).rejects.toBe(err);
+      await expect(result.current.mutateAsync([{ id: "a", action: "apply" }])).rejects.toBe(err);
     });
 
-    expect(toast.error).toHaveBeenCalledWith(
-      expect.stringContaining("Bulk update failed."),
-    );
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Bulk update failed."));
   });
 
   it("falls back to a generic toast for non-APIError bulk failures", async () => {
@@ -202,9 +194,9 @@ describe("useBulkContainers", () => {
 
     const { result } = renderHook(() => useBulkContainers(), { wrapper: Wrapper });
     await act(async () => {
-      await expect(
-        result.current.mutateAsync([{ id: "a", action: "apply" }]),
-      ).rejects.toThrow("network");
+      await expect(result.current.mutateAsync([{ id: "a", action: "apply" }])).rejects.toThrow(
+        "network",
+      );
     });
 
     expect(toast.error).toHaveBeenCalledWith("Bulk update failed.");

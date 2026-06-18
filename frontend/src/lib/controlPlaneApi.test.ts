@@ -118,7 +118,12 @@ describe.each([
   {
     name: "approveApproval",
     call: () => approveApproval("ap-1", "alice"),
-    okBody: { ...validApproval, status: "approved", approver: "alice", approved_at: "2026-04-23T11:00:00Z" },
+    okBody: {
+      ...validApproval,
+      status: "approved",
+      approver: "alice",
+      approved_at: "2026-04-23T11:00:00Z",
+    },
     method: "POST",
     urlMatch: /\/api\/approvals\/ap-1\/approve$/,
     badShape: { status: "weird" },
@@ -160,7 +165,9 @@ describe.each([
 
   it("throws APIError on 401", async () => {
     installFetch(
-      vi.fn(async () => mockJSON({ message: "unauth" }, { status: 401, statusText: "Unauthorized" })) as typeof fetch,
+      vi.fn(async () =>
+        mockJSON({ message: "unauth" }, { status: 401, statusText: "Unauthorized" }),
+      ) as typeof fetch,
     );
     const err = await call().then(
       () => null,
@@ -172,7 +179,9 @@ describe.each([
 
   it("throws APIError on 5xx", async () => {
     installFetch(
-      vi.fn(async () => mockJSON({ message: "boom" }, { status: 500, statusText: "Internal" })) as typeof fetch,
+      vi.fn(async () =>
+        mockJSON({ message: "boom" }, { status: 500, statusText: "Internal" }),
+      ) as typeof fetch,
     );
     const err = await call().then(
       () => null,
@@ -183,9 +192,7 @@ describe.each([
   });
 
   it("throws schema_mismatch APIError when payload shape is wrong", async () => {
-    installFetch(
-      vi.fn(async () => mockJSON(badShape, { status: 200 })) as typeof fetch,
-    );
+    installFetch(vi.fn(async () => mockJSON(badShape, { status: 200 })) as typeof fetch);
     await expect(call()).rejects.toMatchObject({ code: "schema_mismatch" });
   });
 });

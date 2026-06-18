@@ -21,9 +21,11 @@ export default function LogsPage() {
         {entries.length === 0 && (
           <p className="text-muted-foreground">
             Waiting for firewall events… only rule sets with{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">log: true</code>{" "}
-            emit NFLOG events (e.g. label{" "}
-            <code className="text-xs bg-muted px-1 py-0.5 rounded">firefik.firewall.web.log=true</code>{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">log: true</code> emit NFLOG
+            events (e.g. label{" "}
+            <code className="text-xs bg-muted px-1 py-0.5 rounded">
+              firefik.firewall.web.log=true
+            </code>{" "}
             on a container).
           </p>
         )}
@@ -40,20 +42,12 @@ export default function LogsPage() {
                 {entry.action}
               </Badge>
             )}
-            {entry.srcIP && (
-              <span className="text-foreground shrink-0">{entry.srcIP}</span>
-            )}
+            {entry.srcIP && <span className="text-foreground shrink-0">{entry.srcIP}</span>}
             {entry.dstPort != null && (
-              <span className="text-muted-foreground shrink-0">
-                :{entry.dstPort}
-              </span>
+              <span className="text-muted-foreground shrink-0">:{entry.dstPort}</span>
             )}
-            {entry.container && (
-              <span className="text-blue-500 shrink-0">{entry.container}</span>
-            )}
-            {entry.proto && (
-              <span className="text-muted-foreground">{entry.proto}</span>
-            )}
+            {entry.container && <span className="text-blue-500 shrink-0">{entry.container}</span>}
+            {entry.proto && <span className="text-muted-foreground">{entry.proto}</span>}
           </div>
         ))}
       </div>

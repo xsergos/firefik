@@ -84,9 +84,7 @@ describe("containerToLabelsYaml", () => {
         ],
       }),
     );
-    expect(yaml).toContain(
-      'firefik.firewall.ingress.allowlist: "10.0.0.0/24,192.168.1.0/24"',
-    );
+    expect(yaml).toContain('firefik.firewall.ingress.allowlist: "10.0.0.0/24,192.168.1.0/24"');
     expect(yaml).toContain('firefik.firewall.ingress.blocklist: "1.2.3.4"');
   });
 
@@ -148,9 +146,7 @@ describe("containerToLabelsYaml", () => {
   it("omits optional rule-set fields when not provided", () => {
     const yaml = containerToLabelsYaml(
       baseContainer({
-        ruleSets: [
-          { name: "minimal", ports: [], allowlist: [], blocklist: [] },
-        ],
+        ruleSets: [{ name: "minimal", ports: [], allowlist: [], blocklist: [] }],
       }),
     );
     expect(yaml).not.toContain("minimal.ports");

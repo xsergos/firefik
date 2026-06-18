@@ -55,30 +55,62 @@ async function postJSON<T>(path: string, body: unknown, schema: z.ZodType<T>): P
 }
 
 export function fetchTemplates(): Promise<PolicyTemplate[]> {
-  return getJSON("/api/templates", z.array(policyTemplateSchema).nullable().transform((v) => v ?? []));
+  return getJSON(
+    "/api/templates",
+    z
+      .array(policyTemplateSchema)
+      .nullable()
+      .transform((v) => v ?? []),
+  );
 }
 
 export function fetchTemplate(name: string): Promise<PolicyTemplate> {
   return getJSON(`/api/templates/${encodeURIComponent(name)}`, policyTemplateSchema);
 }
 
-export function publishTemplate(t: { name: string; body: string; labels?: Record<string, string> }): Promise<PolicyTemplate> {
+export function publishTemplate(t: {
+  name: string;
+  body: string;
+  labels?: Record<string, string>;
+}): Promise<PolicyTemplate> {
   return postJSON("/api/templates", t, policyTemplateSchema);
 }
 
 export function fetchApprovals(status?: string): Promise<PendingApproval[]> {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return getJSON(`/api/approvals${qs}`, z.array(pendingApprovalSchema).nullable().transform((v) => v ?? []));
+  return getJSON(
+    `/api/approvals${qs}`,
+    z
+      .array(pendingApprovalSchema)
+      .nullable()
+      .transform((v) => v ?? []),
+  );
 }
 
-export function createApproval(p: { policy_name: string; proposed_body: string; requester: string }): Promise<PendingApproval> {
+export function createApproval(p: {
+  policy_name: string;
+  proposed_body: string;
+  requester: string;
+}): Promise<PendingApproval> {
   return postJSON("/api/approvals", p, pendingApprovalSchema);
 }
 
 export function approveApproval(id: string, approver: string): Promise<PendingApproval> {
-  return postJSON(`/api/approvals/${encodeURIComponent(id)}/approve`, { approver }, pendingApprovalSchema);
+  return postJSON(
+    `/api/approvals/${encodeURIComponent(id)}/approve`,
+    { approver },
+    pendingApprovalSchema,
+  );
 }
 
-export function rejectApproval(id: string, approver: string, comment: string): Promise<PendingApproval> {
-  return postJSON(`/api/approvals/${encodeURIComponent(id)}/reject`, { approver, comment }, pendingApprovalSchema);
+export function rejectApproval(
+  id: string,
+  approver: string,
+  comment: string,
+): Promise<PendingApproval> {
+  return postJSON(
+    `/api/approvals/${encodeURIComponent(id)}/reject`,
+    { approver, comment },
+    pendingApprovalSchema,
+  );
 }

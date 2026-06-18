@@ -17,9 +17,7 @@ test.describe("Containers keyboard shortcuts", () => {
 
     await page.keyboard.press("Escape");
 
-    const stillFocused = await searchInput.evaluate(
-      (el) => el === document.activeElement,
-    );
+    const stillFocused = await searchInput.evaluate((el) => el === document.activeElement);
     expect(stillFocused).toBeDefined();
   });
 
@@ -38,8 +36,14 @@ test.describe("Containers keyboard shortcuts", () => {
     const toast = page.locator("[data-sonner-toast]");
     const loader = page.locator("svg.animate-spin");
     const surfaced = await Promise.race([
-      toast.first().waitFor({ state: "visible", timeout: 7_000 }).then(() => "toast"),
-      loader.first().waitFor({ state: "visible", timeout: 7_000 }).then(() => "loader"),
+      toast
+        .first()
+        .waitFor({ state: "visible", timeout: 7_000 })
+        .then(() => "toast"),
+      loader
+        .first()
+        .waitFor({ state: "visible", timeout: 7_000 })
+        .then(() => "loader"),
     ]).catch(() => "none");
 
     expect(["toast", "loader", "none"]).toContain(surfaced);
