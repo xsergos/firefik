@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w" \
     -o firefik-server ./cmd/firefik-server
 
-FROM alpine:3.23.4
+FROM alpine:3.24.1
 
 RUN apk add --no-cache iptables ip6tables nftables wget ca-certificates tzdata \
     && apk upgrade --no-cache \
