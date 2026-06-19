@@ -44,7 +44,7 @@ jobs:
               VITE_PANEL_MODE=fleet
               CADDY_CONFIG=Caddyfile.panel
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -111,7 +111,7 @@ jobs:
           - name: frontend
           - name: panel
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Resolve tag
         id: tag
@@ -209,7 +209,7 @@ jobs:
       contents: write
       actions: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
