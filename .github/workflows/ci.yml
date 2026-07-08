@@ -62,7 +62,7 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Cache Go tool binaries
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/go/bin
           key: go-tools-${{ runner.os }}-swag-1.16.3-govulncheck-latest
@@ -262,7 +262,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: playwright-cache
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
