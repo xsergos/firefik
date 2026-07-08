@@ -2,7 +2,7 @@ module firefik
 
 go 1.25.0
 
-toolchain go1.26.3
+toolchain go1.26.5
 
 require (
 	github.com/containerd/errdefs v1.0.0
