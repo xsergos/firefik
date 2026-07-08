@@ -25,6 +25,12 @@ updates:
     labels:
       - dependencies
       - docker
+    ignore:
+      - dependency-name: "*"
+        versions:
+          - "*rc*"
+          - "*beta*"
+          - "*alpha*"
 
   - package-ecosystem: docker
     directory: "/frontend"
@@ -33,6 +39,12 @@ updates:
     labels:
       - dependencies
       - docker
+    ignore:
+      - dependency-name: "*"
+        versions:
+          - "*rc*"
+          - "*beta*"
+          - "*alpha*"
 
   - package-ecosystem: github-actions
     directory: "/"
