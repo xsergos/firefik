@@ -306,7 +306,26 @@ host_rules:
     ports: [80, 443]
     blocklist:
       - 203.0.113.0/24
+  - name: allow-icmp        # ping/traceroute; needed once host_default is DROP
+    protocol: icmp
+    allowlist:
+      - 10.0.0.0/8
+  - name: allow-icmpv6      # IPv6 needs ICMPv6 (NDP) or v6 connectivity breaks
+    protocol: icmpv6
 ```
+
+With `host_default: DROP` the host stops answering ICMP (ping,
+traceroute, MTU discovery) unless you add an explicit rule. Add an
+`icmp` rule for IPv4 and an `icmpv6` rule for IPv6 — the latter is
+effectively mandatory on dual-stack hosts because Neighbor Discovery
+rides on ICMPv6.
+
+**Supported `protocol` values:** `tcp`, `udp`, `icmp`, `icmpv6` (alias
+`ipv6-icmp`), or omit/`any` to match every protocol. `ports` apply to
+`tcp`/`udp` only. On the **nftables** backend an unrecognised protocol
+is skipped (logged, not applied) rather than opened — a host rule never
+fails open. On the **iptables** backend the value is passed straight to
+`-p`, so any protocol name `iptables` knows also works there.
 
 Internally firefik maintains a dedicated `FIREFIK_HOST` chain hooked
 from `INPUT` (iptables) or a `chain input` block of type filter

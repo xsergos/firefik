@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/nftables"
 	"github.com/google/nftables/expr"
+	"golang.org/x/sys/unix"
 )
 
 const nftHostChainName = "firefik_host"
@@ -47,6 +48,13 @@ func (b *NFTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 
 	for _, rule := range rules {
 		proto := strings.ToLower(strings.TrimSpace(rule.Protocol))
+		if !nftHostProtoSupported(proto) {
+			if b.logger != nil {
+				b.logger.Warn("host rule protocol unsupported on nftables backend; rule NOT applied",
+					"rule", rule.Name, "protocol", proto)
+			}
+			continue
+		}
 		for _, peer := range rule.Blocklist {
 			if rule.Log {
 				if err := b.addHostNflog(chain, proto, rule.Ports, peer, rule.LogPrefix, "DROP"); err != nil {
@@ -182,6 +190,10 @@ func (b *NFTablesBackend) addHostNflog(
 		}
 		return nil
 	}
+	if protoNum, ok := icmpL4ProtoNum(proto); ok {
+		build(l4ProtoMatchExprs(protoNum))
+		return nil
+	}
 	build(nil)
 	return nil
 }
@@ -193,28 +205,29 @@ func (b *NFTablesBackend) addHostMatch(
 	peer net.IPNet,
 	verdict expr.VerdictKind,
 ) error {
-	exprs := make([]expr.Any, 0, 8)
+	base := make([]expr.Any, 0, 8)
 	if peer.IP != nil {
-		exprs = append(exprs, srcNetMatchExprs(peer)...)
+		base = append(base, srcNetMatchExprs(peer)...)
 	}
 	if proto == "tcp" || proto == "udp" {
 		if len(ports) == 0 {
-			exprs = append(exprs, protoAnyPortExprs(proto)...)
+			exprs := append(append([]expr.Any(nil), base...), protoAnyPortExprs(proto)...)
 			exprs = append(exprs, &expr.Verdict{Kind: verdict})
 			b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: chain, Exprs: exprs})
 			return nil
 		}
 		for _, port := range ports {
-			ruleExprs := make([]expr.Any, 0, 12)
-			ruleExprs = append(ruleExprs, exprs...)
-			ruleExprs = append(ruleExprs, protoPortExprs(proto, port)...)
-			ruleExprs = append(ruleExprs, &expr.Verdict{Kind: verdict})
-			b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: chain, Exprs: ruleExprs})
+			exprs := append(append([]expr.Any(nil), base...), protoPortExprs(proto, port)...)
+			exprs = append(exprs, &expr.Verdict{Kind: verdict})
+			b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: chain, Exprs: exprs})
 		}
 		return nil
 	}
-	exprs = append(exprs, &expr.Verdict{Kind: verdict})
-	b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: chain, Exprs: exprs})
+	if protoNum, ok := icmpL4ProtoNum(proto); ok {
+		base = append(base, l4ProtoMatchExprs(protoNum)...)
+	}
+	base = append(base, &expr.Verdict{Kind: verdict})
+	b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: chain, Exprs: base})
 	return nil
 }
 
@@ -225,6 +238,31 @@ func protoAnyPortExprs(proto string) []expr.Any {
 	} else {
 		protoNum = 6
 	}
+	return []expr.Any{
+		&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
+		&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{protoNum}},
+	}
+}
+
+func nftHostProtoSupported(proto string) bool {
+	switch proto {
+	case "", "any", "tcp", "udp", "icmp", "icmpv6", "ipv6-icmp":
+		return true
+	}
+	return false
+}
+
+func icmpL4ProtoNum(proto string) (uint8, bool) {
+	switch proto {
+	case "icmp":
+		return uint8(unix.IPPROTO_ICMP), true
+	case "icmpv6", "ipv6-icmp":
+		return uint8(unix.IPPROTO_ICMPV6), true
+	}
+	return 0, false
+}
+
+func l4ProtoMatchExprs(protoNum uint8) []expr.Any {
 	return []expr.Any{
 		&expr.Meta{Key: expr.MetaKeyL4PROTO, Register: 1},
 		&expr.Cmp{Op: expr.CmpOpEq, Register: 1, Data: []byte{protoNum}},

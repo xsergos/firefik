@@ -44,7 +44,7 @@ export function AgentLogsPanel({ agentID }: { agentID: string }) {
           return next;
         });
       } catch {
-        /* ignore non-JSON */
+        return;
       }
     };
 

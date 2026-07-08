@@ -66,6 +66,34 @@ func TestEngine_ApplyHostRules_NormalizesDefaultAndCIDRs(t *testing.T) {
 	}
 }
 
+func TestEngine_ApplyHostRules_PreservesICMPProtocol(t *testing.T) {
+	back := newRecordingBackend()
+	eng := newHostTestEngine(t, back)
+
+	rf := config.RulesFile{
+		HostDefault: "DROP",
+		HostRules: []config.FileHostRuleSet{
+			{Name: "ping", Protocol: "ICMP"},
+			{Name: "ping6", Protocol: "ICMPv6", Allowlist: []string{"fe80::/10"}},
+		},
+	}
+	if err := eng.applyHostRules(rf); err != nil {
+		t.Fatalf("applyHostRules: %v", err)
+	}
+	if len(back.hostAppliedRules) != 2 {
+		t.Fatalf("rules count: %d", len(back.hostAppliedRules))
+	}
+	if back.hostAppliedRules[0].Protocol != "icmp" {
+		t.Fatalf("icmp protocol not normalized to lowercase: %q", back.hostAppliedRules[0].Protocol)
+	}
+	if back.hostAppliedRules[1].Protocol != "icmpv6" {
+		t.Fatalf("icmpv6 protocol not normalized to lowercase: %q", back.hostAppliedRules[1].Protocol)
+	}
+	if back.hostAppliedRules[1].Allowlist[0].String() != "fe80::/10" {
+		t.Fatalf("v6 allowlist CIDR not preserved: %s", back.hostAppliedRules[1].Allowlist[0].String())
+	}
+}
+
 func TestEngine_ApplyHostRules_RemovesChainWhenEmpty(t *testing.T) {
 	back := newRecordingBackend()
 	eng := newHostTestEngine(t, back)

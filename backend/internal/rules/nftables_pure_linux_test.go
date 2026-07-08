@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/nftables/expr"
+	"golang.org/x/sys/unix"
 )
 
 func TestNFTContainerChain(t *testing.T) {
@@ -160,5 +161,61 @@ func TestProtoPortExprs(t *testing.T) {
 	udp := protoPortExprs("UDP", 53)
 	if len(udp) != 4 {
 		t.Errorf("expected 4 exprs for udp, got %d", len(udp))
+	}
+}
+
+func TestICMPL4ProtoNum(t *testing.T) {
+	cases := []struct {
+		proto string
+		num   uint8
+		ok    bool
+	}{
+		{"icmp", uint8(unix.IPPROTO_ICMP), true},
+		{"icmpv6", uint8(unix.IPPROTO_ICMPV6), true},
+		{"ipv6-icmp", uint8(unix.IPPROTO_ICMPV6), true},
+		{"tcp", 0, false},
+		{"udp", 0, false},
+		{"", 0, false},
+		{"any", 0, false},
+		{"gre", 0, false},
+	}
+	for _, c := range cases {
+		num, ok := icmpL4ProtoNum(c.proto)
+		if ok != c.ok || (ok && num != c.num) {
+			t.Errorf("icmpL4ProtoNum(%q) = (%d,%v), want (%d,%v)", c.proto, num, ok, c.num, c.ok)
+		}
+	}
+}
+
+func TestL4ProtoMatchExprs(t *testing.T) {
+	exprs := l4ProtoMatchExprs(uint8(unix.IPPROTO_ICMP))
+	if len(exprs) != 2 {
+		t.Fatalf("expected 2 exprs, got %d", len(exprs))
+	}
+	m, ok := exprs[0].(*expr.Meta)
+	if !ok || m.Key != expr.MetaKeyL4PROTO {
+		t.Errorf("first expr should be Meta{L4PROTO}, got %T", exprs[0])
+	}
+	c, ok := exprs[1].(*expr.Cmp)
+	if !ok || c.Op != expr.CmpOpEq || len(c.Data) != 1 || c.Data[0] != uint8(unix.IPPROTO_ICMP) {
+		t.Errorf("second expr should be Cmp eq [%d], got %+v", uint8(unix.IPPROTO_ICMP), exprs[1])
+	}
+
+	v6 := l4ProtoMatchExprs(uint8(unix.IPPROTO_ICMPV6))
+	if c6, ok := v6[1].(*expr.Cmp); !ok || c6.Data[0] != uint8(unix.IPPROTO_ICMPV6) {
+		t.Errorf("icmpv6 match should compare to %d, got %+v", uint8(unix.IPPROTO_ICMPV6), v6[1])
+	}
+}
+
+func TestNFTHostProtoSupported(t *testing.T) {
+	for _, p := range []string{"", "any", "tcp", "udp", "icmp", "icmpv6", "ipv6-icmp"} {
+		if !nftHostProtoSupported(p) {
+			t.Errorf("proto %q should be supported", p)
+		}
+	}
+	for _, p := range []string{"gre", "esp", "ah", "sctp", "tcpp", "1", "ICMP"} {
+		if nftHostProtoSupported(p) {
+			t.Errorf("proto %q must be rejected (fail-closed; caller lowercases first)", p)
+		}
 	}
 }

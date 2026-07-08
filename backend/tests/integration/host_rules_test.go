@@ -3,8 +3,11 @@
 package integration
 
 import (
+	"net"
 	"strings"
 	"testing"
+
+	"firefik/internal/rules"
 )
 
 func TestNFTables_ApplyHostRules_LoopbackAcceptOnDrop(t *testing.T) {
@@ -38,6 +41,41 @@ func TestNFTables_ApplyHostRules_NoLoopbackOnReturn(t *testing.T) {
 
 	out := nftListRuleset(t)
 	assertNotContains(t, out, `iifname "lo" accept`)
+}
+
+func TestNFTables_ApplyHostRules_ICMPProtoScoped(t *testing.T) {
+	requireRoot(t)
+	b := newNFTablesBackend(t, testChainName(t))
+	t.Cleanup(func() { _ = b.RemoveHostChain() })
+
+	hostRules := []rules.HostRule{
+		{Name: "ping", Protocol: "icmp"},
+		{Name: "ping6", Protocol: "icmpv6"},
+	}
+	if err := b.ApplyHostRules(hostRules, "DROP"); err != nil {
+		t.Fatalf("ApplyHostRules: %v", err)
+	}
+
+	out := nftListRuleset(t)
+	assertContains(t, out, "chain firefik_host")
+	assertContains(t, out, "l4proto icmp accept")
+	assertContains(t, out, "l4proto ipv6-icmp accept")
+}
+
+func TestNFTables_ApplyHostRules_UnsupportedProtoNotFailOpen(t *testing.T) {
+	requireRoot(t)
+	b := newNFTablesBackend(t, testChainName(t))
+	t.Cleanup(func() { _ = b.RemoveHostChain() })
+
+	hostRules := []rules.HostRule{
+		{Name: "weird", Protocol: "gre", Allowlist: []net.IPNet{mustCIDR("203.0.113.7/32")}},
+	}
+	if err := b.ApplyHostRules(hostRules, "DROP"); err != nil {
+		t.Fatalf("ApplyHostRules: %v", err)
+	}
+
+	out := nftListRuleset(t)
+	assertNotContains(t, out, "203.0.113.7")
 }
 
 func TestIPTables_ApplyHostRules_LoopbackAcceptOnDrop(t *testing.T) {
