@@ -65,7 +65,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/go/bin
-          key: go-tools-${{ runner.os }}-swag-1.16.3-govulncheck-latest
+          key: go-tools-${{ runner.os }}-swag-1.16.3-govulncheck-v1.5.0
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -88,7 +88,7 @@ jobs:
       - name: govulncheck
         run: |
           if ! command -v govulncheck >/dev/null 2>&1; then
-            go install golang.org/x/vuln/cmd/govulncheck@latest
+            go install golang.org/x/vuln/cmd/govulncheck@v1.5.0
           fi
           govulncheck ./...
 
