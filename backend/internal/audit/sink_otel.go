@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/log/global"
 )
@@ -36,21 +37,21 @@ func (s *OTelSink) Write(ev Event) error {
 	if err != nil {
 		return err
 	}
-	rec.SetBody(log.StringValue(string(body)))
+	rec.SetBody(attribute.StringValue(string(body)))
 	rec.AddAttributes(
-		log.String("audit.action", ev.Action),
-		log.String("audit.source", string(ev.Source)),
-		log.String("audit.container_id", ev.ContainerID),
-		log.String("audit.container_name", ev.ContainerName),
+		attribute.String("audit.action", ev.Action),
+		attribute.String("audit.source", string(ev.Source)),
+		attribute.String("audit.container_id", ev.ContainerID),
+		attribute.String("audit.container_name", ev.ContainerName),
 	)
 	if ev.DefaultPolicy != "" {
-		rec.AddAttributes(log.String("audit.default_policy", ev.DefaultPolicy))
+		rec.AddAttributes(attribute.String("audit.default_policy", ev.DefaultPolicy))
 	}
 	if ev.RuleSets > 0 {
-		rec.AddAttributes(log.Int64("audit.rule_sets", int64(ev.RuleSets)))
+		rec.AddAttributes(attribute.Int64("audit.rule_sets", int64(ev.RuleSets)))
 	}
 	for k, v := range ev.Metadata {
-		rec.AddAttributes(log.String("audit.metadata."+k, v))
+		rec.AddAttributes(attribute.String("audit.metadata."+k, v))
 	}
 	s.logger.Emit(context.Background(), rec)
 	return nil
