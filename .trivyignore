@@ -4,23 +4,32 @@
 
 # === caddy gobinary, frontend image ===========================================
 #
-# Caddy v2.11.3 binary embeds these third-party libs at the versions caddy's
+# Caddy v2.11.4 binary embeds these third-party libs at the versions caddy's
 # go.mod pinned. The vulnerable code paths are NOT reachable in our
 # `frontend/Caddyfile.panel`:
 #
 #   * `auto_https off` — no ACME / no internal CA / no smallstep SCEP;
 #   * no `caddyauth` / `jwt` / `oauth` modules — go-jose unreachable;
 #   * no Caddy OTel telemetry exporter enabled;
-#   * no gRPC reverse-proxy modules.
+#   * no gRPC reverse-proxy modules;
+#   * no ACME-DNS challenge and no custom `resolvers` — x/net dnsmessage
+#     wire-parsing not exercised;
+#   * static `file_server` + HTTP `reverse_proxy` only — no language matchers
+#     or x/text encoding on the request path.
 #
 # Caddy upstream ships these libs in their binary regardless of whether the
 # affected modules are loaded; we accept the trivy noise until caddy releases
-# a binary built against patched deps. Followup: bump caddy version on every
-# upstream release; remove entries that disappear from new caddy binary scans.
+# a binary built against patched deps. Caddy `master` already bumped
+# x/net→0.57, x/text→0.40, grpc→1.82.1, so the next caddy release clears the
+# DNS/UTF-8/grpc trio below. Followup: bump caddy version on every upstream
+# release; remove entries that disappear from new caddy binary scans.
 
-CVE-2026-34986   # go-jose v3/v4 — JWE DoS; we don't use caddyauth / JWT.
-CVE-2026-30836   # smallstep/certificates — SCEP; we have auto_https off.
-CVE-2026-29181   # otel baggage header — caddy OTel exporter not enabled.
-CVE-2026-39883   # otel SDK PATH hijack — caddy OTel exporter not enabled.
-CVE-2026-33186   # grpc-go authz — caddy gRPC reverse-proxy not used.
-CVE-2026-33816   # jackc/pgx v5 — caddy postgres-storage module not loaded (default file_storage).
+CVE-2026-34986        # go-jose v3/v4 — JWE DoS; we don't use caddyauth / JWT.
+CVE-2026-30836        # smallstep/certificates — SCEP; we have auto_https off.
+CVE-2026-29181        # otel baggage header — caddy OTel exporter not enabled.
+CVE-2026-39883        # otel SDK PATH hijack — caddy OTel exporter not enabled.
+CVE-2026-33186        # grpc-go authz — caddy gRPC reverse-proxy not used.
+CVE-2026-33816        # jackc/pgx v5 — caddy postgres-storage module not loaded (default file_storage).
+CVE-2026-46600        # x/net dnsmessage DoS — no ACME-DNS / no custom resolvers; DNS wire-parsing unreachable.
+CVE-2026-56852        # x/text UTF-8 DoS — no language matchers / x/text encoding on static+proxy request path.
+GHSA-hrxh-6v49-42gf   # grpc-go xDS RBAC + HTTP/2 — no gRPC modules; caddy HTTP/2 server is x/net/http2, not grpc-go.
