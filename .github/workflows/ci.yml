@@ -65,7 +65,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/go/bin
-          key: go-tools-${{ runner.os }}-swag-1.16.3-govulncheck-v1.5.0
+          key: go-tools-${{ runner.os }}-go1.27-swag-1.16.6-govulncheck-v1.5.0
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
@@ -81,7 +81,7 @@ jobs:
       - name: openapi drift check
         run: |
           if ! command -v swag >/dev/null 2>&1; then
-            go install github.com/swaggo/swag/cmd/swag@v1.16.3
+            go install github.com/swaggo/swag/cmd/swag@v1.16.6
           fi
           make openapi-check
 
