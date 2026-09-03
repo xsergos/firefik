@@ -23,6 +23,12 @@
 # x/net→0.57, x/text→0.40, grpc→1.82.1, so the next caddy release clears the
 # DNS/UTF-8/grpc trio below. Followup: bump caddy version on every upstream
 # release; remove entries that disappear from new caddy binary scans.
+#
+# As of 2026-09-04 v2.11.4 (2026-06-03) is still the newest caddy release, so
+# none of these can be cleared by a version bump yet. The permanent fix is to
+# stop using `go install caddy@version` and build caddy from a local module
+# that pins patched x/crypto, x/net, x/text and grpc — worth doing once the
+# build can be validated locally.
 
 CVE-2026-34986        # go-jose v3/v4 — JWE DoS; we don't use caddyauth / JWT.
 CVE-2026-30836        # smallstep/certificates — SCEP; we have auto_https off.
@@ -33,3 +39,5 @@ CVE-2026-33816        # jackc/pgx v5 — caddy postgres-storage module not loade
 CVE-2026-46600        # x/net dnsmessage DoS — no ACME-DNS / no custom resolvers; DNS wire-parsing unreachable.
 CVE-2026-56852        # x/text UTF-8 DoS — no language matchers / x/text encoding on static+proxy request path.
 GHSA-hrxh-6v49-42gf   # grpc-go xDS RBAC + HTTP/2 — no gRPC modules; caddy HTTP/2 server is x/net/http2, not grpc-go.
+CVE-2026-56854        # CRITICAL x/crypto v0.52.0 (fix 0.55.0) — flaw is in golang.org/x/crypto/ssh; caddy standard build has no SSH server or client module, x/crypto is linked for TLS/ACME only.
+CVE-2026-84304        # grpc-go v1.81.0 (fix 1.83.1) — caddy gRPC modules not loaded; panel serves static files + HTTP reverse_proxy only. Our own backend already runs grpc v1.83.2.
