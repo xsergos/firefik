@@ -80,6 +80,7 @@ jobs:
             ${{ matrix.component.extra_build_args }}
           cache-from: type=gha,scope=${{ matrix.component.name }}-${{ matrix.runner.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component.name }}-${{ matrix.runner.arch }}
+          no-cache-filters: runtime
 
       - name: Export digest
         run: |

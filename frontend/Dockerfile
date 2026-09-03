@@ -19,7 +19,7 @@ ENV CGO_ENABLED=0
 RUN go install -trimpath -ldflags="-s -w" \
     github.com/caddyserver/caddy/v2/cmd/caddy@${CADDY_VERSION}
 
-FROM alpine:3.24.1
+FROM alpine:3.24.1 AS runtime
 ARG CADDY_CONFIG=Caddyfile
 RUN apk add --no-cache wget ca-certificates \
     && apk upgrade --no-cache \

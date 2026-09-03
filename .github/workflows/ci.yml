@@ -201,6 +201,7 @@ jobs:
           build-args: ${{ matrix.image.extra_build_args }}
           cache-from: type=gha,scope=${{ matrix.image.name }}-${{ matrix.runner.arch }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image.name }}-${{ matrix.runner.arch }}
+          no-cache-filters: runtime
 
       - name: Trivy scan ${{ matrix.image.name }} (${{ matrix.runner.arch }})
         uses: aquasecurity/trivy-action@master
