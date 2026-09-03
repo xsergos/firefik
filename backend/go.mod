@@ -20,7 +20,7 @@ require (
 	github.com/moby/moby/client v0.5.1
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus/client_golang v1.24.1
-	github.com/prometheus/client_model v0.6.2
+	github.com/prometheus/client_model v0.6.3
 	github.com/robfig/cron/v3 v3.0.1
 	go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin v0.71.0
 	go.opentelemetry.io/otel v1.46.0
