@@ -1,15 +1,24 @@
 # Trivy ignore list (image scans).
 # Each entry MUST include: severity, justification, expiry-or-followup.
 # Re-evaluate every time we bump caddy / dependencies.
+#
+# How to re-audit (no docker needed): read the dependency versions caddy pins
+# in its own go.mod for the tag we build —
+#   https://raw.githubusercontent.com/caddyserver/caddy/<CADDY_VERSION>/go.mod
+# — then ask OSV whether that exact version is still affected:
+#   POST https://api.osv.dev/v1/query {"package":{"name":"<mod>","ecosystem":"Go"},"version":"<ver>"}
+# An empty result means caddy has moved past the fix and the entry below is
+# dead weight; delete it. OSV and trivy's DB are not identical, so confirm on
+# the next CI run — the docker-images job scans with exit-code 0 and prints the
+# full HIGH/CRITICAL table.
 
-# === caddy gobinary, frontend image ===========================================
+# === caddy gobinary, frontend + panel images ==================================
 #
 # Caddy v2.11.4 binary embeds these third-party libs at the versions caddy's
 # go.mod pinned. The vulnerable code paths are NOT reachable in our
 # `frontend/Caddyfile.panel`:
 #
 #   * `auto_https off` — no ACME / no internal CA / no smallstep SCEP;
-#   * no `caddyauth` / `jwt` / `oauth` modules — go-jose unreachable;
 #   * no Caddy OTel telemetry exporter enabled;
 #   * no gRPC reverse-proxy modules;
 #   * no ACME-DNS challenge and no custom `resolvers` — x/net dnsmessage
@@ -18,26 +27,13 @@
 #     or x/text encoding on the request path.
 #
 # Caddy upstream ships these libs in their binary regardless of whether the
-# affected modules are loaded; we accept the trivy noise until caddy releases
-# a binary built against patched deps. Caddy `master` already bumped
-# x/net→0.57, x/text→0.40, grpc→1.82.1, so the next caddy release clears the
-# DNS/UTF-8/grpc trio below. Followup: bump caddy version on every upstream
-# release; remove entries that disappear from new caddy binary scans.
-#
-# As of 2026-09-04 v2.11.4 (2026-06-03) is still the newest caddy release, so
-# none of these can be cleared by a version bump yet. The permanent fix is to
-# stop using `go install caddy@version` and build caddy from a local module
-# that pins patched x/crypto, x/net, x/text and grpc — worth doing once the
-# build can be validated locally.
+# affected modules are loaded; we accept the trivy noise until caddy releases a
+# binary built against patched deps. v2.11.4 (2026-06-03) is still the newest
+# release as of 2026-09-04, so none of the five below can be cleared yet.
+# Followup: bump caddy on every upstream release, then re-run the audit above.
 
-CVE-2026-34986        # go-jose v3/v4 — JWE DoS; we don't use caddyauth / JWT.
-CVE-2026-30836        # smallstep/certificates — SCEP; we have auto_https off.
-CVE-2026-29181        # otel baggage header — caddy OTel exporter not enabled.
-CVE-2026-39883        # otel SDK PATH hijack — caddy OTel exporter not enabled.
-CVE-2026-33186        # grpc-go authz — caddy gRPC reverse-proxy not used.
-CVE-2026-33816        # jackc/pgx v5 — caddy postgres-storage module not loaded (default file_storage).
-CVE-2026-46600        # x/net dnsmessage DoS — no ACME-DNS / no custom resolvers; DNS wire-parsing unreachable.
-CVE-2026-56852        # x/text UTF-8 DoS — no language matchers / x/text encoding on static+proxy request path.
-GHSA-hrxh-6v49-42gf   # grpc-go xDS RBAC + HTTP/2 — no gRPC modules; caddy HTTP/2 server is x/net/http2, not grpc-go.
+CVE-2026-46600        # HIGH x/net v0.55.0 — dnsmessage DoS; no ACME-DNS / no custom resolvers, DNS wire-parsing unreachable.
+CVE-2026-56852        # HIGH x/text v0.37.0 — UTF-8 DoS; no language matchers / x/text encoding on static+proxy request path.
+GHSA-hrxh-6v49-42gf   # HIGH grpc-go v1.81.0 (fix 1.82.1) — xDS RBAC + HTTP/2; no gRPC modules, caddy HTTP/2 server is x/net/http2, not grpc-go.
 CVE-2026-56854        # CRITICAL x/crypto v0.52.0 (fix 0.55.0) — flaw is in golang.org/x/crypto/ssh; caddy standard build has no SSH server or client module, x/crypto is linked for TLS/ACME only.
-CVE-2026-84304        # grpc-go v1.81.0 (fix 1.83.1) — caddy gRPC modules not loaded; panel serves static files + HTTP reverse_proxy only. Our own backend already runs grpc v1.83.2.
+CVE-2026-84304        # HIGH grpc-go v1.81.0 (fix 1.83.1) — caddy gRPC modules not loaded; panel serves static files + HTTP reverse_proxy only. Our own backend already runs grpc v1.83.2.
