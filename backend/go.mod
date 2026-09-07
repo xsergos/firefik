@@ -16,7 +16,7 @@ require (
 	github.com/google/nftables v0.3.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
-	github.com/moby/moby/api v1.55.0
+	github.com/moby/moby/api v1.56.0
 	github.com/moby/moby/client v0.5.1
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus/client_golang v1.24.1
