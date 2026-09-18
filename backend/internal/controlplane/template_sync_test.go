@@ -103,13 +103,15 @@ func TestTemplateSyncer_PullsAndCachesToDisk(t *testing.T) {
 		Logger:   slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	go func() { _ = syncer.Run(ctx) }()
 
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(2 * time.Second)
+	var files []os.DirEntry
 	for time.Now().Before(deadline) {
-		if got := syncer.Snapshot(); len(got) == 1 {
+		files, _ = os.ReadDir(dir)
+		if len(syncer.Snapshot()) == 1 && len(files) == 1 && files[0].Name() == "deny-egress.json" {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -122,9 +124,8 @@ func TestTemplateSyncer_PullsAndCachesToDisk(t *testing.T) {
 	if _, ok := syncer.Get("deny-egress"); !ok {
 		t.Error("Get failed")
 	}
-	files, _ := os.ReadDir(dir)
-	if len(files) != 1 {
-		t.Errorf("expected 1 cache file, got %d", len(files))
+	if len(files) != 1 || files[0].Name() != "deny-egress.json" {
+		t.Errorf("cache dir: %v", files)
 	}
 }
 
