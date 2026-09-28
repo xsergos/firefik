@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -87,10 +88,16 @@ func run() error {
 	serverCertRenewBefore := flag.Duration("server-cert-renew-before", 30*24*time.Hour, "daily-check renews server cert when remaining < this")
 	serverCertKeypairPrefix := flag.String("server-cert-keypair", "", "path prefix for auto-issued server cert (suffix .crt/.key); default <ca-state-dir>/cp-server")
 	minRenewInterval := flag.Duration("min-renew-interval", 5*time.Minute, "rate limit between two RenewCert RPCs from the same cert serial")
-	renewWindow := flag.Duration("renew-window", 24*time.Hour, "RenewCert is rejected unless the peer cert expires within this window")
+	renewWindow := flag.Duration("renew-window", renewWindowFromEnv(), "RenewCert is rejected unless the peer cert expires within this window (env FIREFIK_CP_CERT_RENEW_WINDOW, seconds); keep >= agent FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	if *renewWindow > 0 && *renewWindow < controlplane.DefaultCertRenewBefore {
+		logger.Warn("renew window is shorter than the agent default renew-before; agents on default settings are rejected until remaining < renew window",
+			"renew_window", *renewWindow,
+			"agent_default_renew_before", controlplane.DefaultCertRenewBefore,
+		)
+	}
 
 	logsCtx, logsCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	logsShutdown, err := telemetry.InitLogs(logsCtx, "firefik-server", logger)
@@ -439,6 +446,20 @@ func defaultDBPath() string {
 		return v
 	}
 	return "/var/lib/firefik-server/firefik.db"
+}
+
+func renewWindowFromEnv() time.Duration {
+	v := strings.TrimSpace(os.Getenv("FIREFIK_CP_CERT_RENEW_WINDOW"))
+	if v == "" {
+		return controlplane.DefaultRenewWindow
+	}
+	if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+		return time.Duration(n) * time.Second
+	}
+	if d, err := time.ParseDuration(v); err == nil && d > 0 {
+		return d
+	}
+	return controlplane.DefaultRenewWindow
 }
 
 func trustDomainFromEnv() string {

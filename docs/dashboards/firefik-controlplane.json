@@ -167,9 +167,8 @@
             "mode": "absolute",
             "steps": [
               { "color": "red", "value": null },
-              { "color": "orange", "value": 7 },
-              { "color": "yellow", "value": 14 },
-              { "color": "green", "value": 30 }
+              { "color": "orange", "value": 1 },
+              { "color": "green", "value": 2 }
             ]
           },
           "unit": "d"

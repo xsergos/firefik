@@ -343,7 +343,7 @@ for two weeks for the rare agent that missed the rollover window.
 |---|---|---|
 | RenewCert error `PermissionDenied: revoked` | serial in `<state-dir>/revoked.json` | Re-enroll agent: `firefik-admin enroll` (operator path) |
 | RenewCert error `ResourceExhausted` | hit `--min-renew-interval` rate-limit | Wait or raise the limit |
-| RenewCert error `FailedPrecondition: certificate valid for ...` | agent ticking too eagerly outside the window | Check agent `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE` |
+| RenewCert error `FailedPrecondition: certificate valid for ...; renew window is ...`, `firefik_agent_cert_renew_failed_total{reason="outside_window"}` | CP `--renew-window` (`FIREFIK_CP_CERT_RENEW_WINDOW`) is shorter than agent `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE`; the CP logs a startup warning when its window is below the 72h agent default | Raise the CP window to at least the agent renew-before (default 72h on both sides). The agent backs off to the CP window after the first rejection, so the cert still renews, only later |
 | TLS handshake error reaching `:8444` | server cert SAN mismatch / expired | `firefik-server cert rotate --force` |
 | Renew goroutine never logs anything | `FIREFIK_CONTROL_PLANE_GRPC` empty | Set the gRPC endpoint |
 

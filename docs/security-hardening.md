@@ -215,12 +215,18 @@ to "good to have".
   - `firefik_agent_cert_renew_failed_total{reason}` and the server-side
     `firefik_controlplane_cert_renew_rejected_total{reason}` should
     stay at zero outside maintenance. `reason="rate_limited"` indicates
-    a buggy agent ratcheting on the renew loop.
+    a buggy agent ratcheting on the renew loop. Agent
+    `reason="outside_window"` (server `outside_renewal_window`) means
+    the server `--renew-window` / `FIREFIK_CP_CERT_RENEW_WINDOW`
+    (default 72h) is shorter than the agent
+    `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE` (default 72h). Keep the
+    server window ≥ the agent renew-before; otherwise the real safety
+    margin shrinks to the server window.
   - `firefik_agent_bundle_rotated_total` ticks whenever the mini-CA
     root rotation propagates to the agent — alert on unexpected
     increments outside a planned root rotation.
   - `firefik_controlplane_agent_cert_days_until_expiry` gauge stays
-    ≥ 7 days on healthy agents.
+    ≥ ~3 days (the agent renew-before) on healthy agents; alert below 2.
   - `firefik_controlplane_server_cert_renewed_total{reason}` should
     tick once per `--server-cert-renew-before` window (default 30d
     before expiry, ~once a year on default TTL); a sudden burst with

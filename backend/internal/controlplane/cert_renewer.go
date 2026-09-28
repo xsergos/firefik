@@ -12,12 +12,18 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	pb "firefik/internal/controlplane/gen/controlplanev1"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+const DefaultCertRenewBefore = 72 * time.Hour
 
 type RenewClient interface {
 	RenewCert(ctx context.Context, in *pb.RenewCertRequest, opts ...grpc.CallOption) (*pb.RenewCertResponse, error)
@@ -35,7 +41,8 @@ type CertRenewer struct {
 	Client      RenewClient
 	OnRotated   func()
 
-	clock func() time.Time
+	clock    func() time.Time
+	cpWindow atomic.Int64
 }
 
 func (r *CertRenewer) Run(ctx context.Context) error {
@@ -48,7 +55,7 @@ func (r *CertRenewer) Run(ctx context.Context) error {
 		interval = 30 * time.Minute
 	}
 	if r.RenewBefore <= 0 {
-		r.RenewBefore = 72 * time.Hour
+		r.RenewBefore = DefaultCertRenewBefore
 	}
 
 	r.tick(ctx, logger)
@@ -80,7 +87,7 @@ func (r *CertRenewer) tick(ctx context.Context, logger *slog.Logger) {
 		now = r.clock()
 	}
 	remaining := cert.NotAfter.Sub(now)
-	if remaining > r.RenewBefore {
+	if remaining > r.renewThreshold() {
 		return
 	}
 	logger.Info("cert renew: starting", "agent_id", r.AgentID, "remaining", remaining.Truncate(time.Second))
@@ -98,8 +105,19 @@ func (r *CertRenewer) tick(ctx context.Context, logger *slog.Logger) {
 		CsrPem:     csrPEM,
 	})
 	if err != nil {
-		logger.Warn("cert renew: RPC failed", "error", err)
-		AgentCertRenewFailedTotal.WithLabelValues("rpc_error").Inc()
+		reason := renewFailureReason(err)
+		AgentCertRenewFailedTotal.WithLabelValues(reason).Inc()
+		if reason == "outside_window" {
+			window, _ := parseRenewWindow(err)
+			r.cpWindow.Store(int64(window))
+			logger.Info("cert renew: outside control-plane renew window, deferring",
+				"remaining", remaining.Truncate(time.Second),
+				"cp_window", window,
+				"renew_before", r.RenewBefore,
+			)
+			return
+		}
+		logger.Warn("cert renew: RPC failed", "reason", reason, "error", err)
 		return
 	}
 	if len(resp.GetCertPem()) == 0 {
@@ -125,6 +143,7 @@ func (r *CertRenewer) tick(ctx context.Context, logger *slog.Logger) {
 		}
 	}
 
+	r.cpWindow.Store(0)
 	AgentCertRenewedTotal.Inc()
 	logger.Info("cert renew: rotated",
 		"agent_id", r.AgentID,
@@ -134,6 +153,44 @@ func (r *CertRenewer) tick(ctx context.Context, logger *slog.Logger) {
 	if r.OnRotated != nil {
 		r.OnRotated()
 	}
+}
+
+func (r *CertRenewer) renewThreshold() time.Duration {
+	threshold := r.RenewBefore
+	if threshold <= 0 {
+		threshold = DefaultCertRenewBefore
+	}
+	if w := time.Duration(r.cpWindow.Load()); w > 0 && w < threshold {
+		threshold = w
+	}
+	return threshold
+}
+
+func renewFailureReason(err error) string {
+	switch status.Code(err) {
+	case codes.FailedPrecondition:
+		if _, ok := parseRenewWindow(err); ok {
+			return "outside_window"
+		}
+	case codes.ResourceExhausted:
+		return "rate_limited"
+	case codes.PermissionDenied, codes.Unauthenticated:
+		return "denied"
+	}
+	return "rpc_error"
+}
+
+func parseRenewWindow(err error) (time.Duration, bool) {
+	msg := status.Convert(err).Message()
+	i := strings.LastIndex(msg, renewWindowMarker)
+	if i < 0 {
+		return 0, false
+	}
+	d, perr := time.ParseDuration(msg[i+len(renewWindowMarker):])
+	if perr != nil || d <= 0 {
+		return 0, false
+	}
+	return d, true
 }
 
 func (r *CertRenewer) logger() *slog.Logger {

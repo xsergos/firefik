@@ -278,6 +278,23 @@ func TestTrustDomainFromEnvSet(t *testing.T) {
 	}
 }
 
+func TestRenewWindowFromEnv(t *testing.T) {
+	cases := map[string]time.Duration{
+		"":       controlplane.DefaultRenewWindow,
+		"259200": 72 * time.Hour,
+		"96h":    96 * time.Hour,
+		"0":      controlplane.DefaultRenewWindow,
+		"-5":     controlplane.DefaultRenewWindow,
+		"bogus":  controlplane.DefaultRenewWindow,
+	}
+	for in, want := range cases {
+		t.Setenv("FIREFIK_CP_CERT_RENEW_WINDOW", in)
+		if got := renewWindowFromEnv(); got != want {
+			t.Errorf("%q: got %s, want %s", in, got, want)
+		}
+	}
+}
+
 func TestDefaultCAStateDirDefault(t *testing.T) {
 	t.Setenv("FIREFIK_CP_CA_DIR", "")
 	if got := defaultCAStateDir(); got == "" {

@@ -175,11 +175,36 @@ Commands sent agent-ward by kind.
 
 ### `firefik_controlplane_agent_cert_days_until_expiry` (gauge,
 labels `agent_id`, `spiffe_id`) — *v0.11+*
-Days until each agent's cert expires. **Never let this drop below
-7 days without action.**
+Days until each agent's cert expires. A healthy agent renews on the
+first tick after the value crosses its renew-before (agent
+`FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE`, default 72h = 3 days) and
+the value jumps back to the cert TTL (default 30 days). In a healthy
+cycle it never goes below ~3 days.
 
-- **Alert (warn)**: `min by(agent_id) (firefik_controlplane_agent_cert_days_until_expiry) < 14`.
-- **Alert (crit)**: same metric `< 3`.
+- **Alert (warn)**: `min by(agent_id) (firefik_controlplane_agent_cert_days_until_expiry) < 2`
+  — renewal is at least one day late.
+- **Alert (crit)**: same metric `< 1`. If the CP stays unreachable the
+  cert expires and the agent needs a manual re-enroll.
+- Keep the warn threshold below renew-before in days. With a longer
+  renew-before, raise both thresholds with it.
+
+### `firefik_agent_cert_renew_failed_total` (counter, label `reason`, agent)
+Failed self-renewal attempts, by reason.
+
+| `reason` | Meaning |
+|---|---|
+| `outside_window` | CP answered `FailedPrecondition`: the cert is not yet inside the CP `--renew-window`. The agent logs at Info and waits until it is. Means the CP window is shorter than the agent renew-before. |
+| `rate_limited` | CP answered `ResourceExhausted` (`--min-renew-interval`). |
+| `denied` | CP answered `PermissionDenied` / `Unauthenticated`: revoked serial, trust-domain or agent-id mismatch, no client cert. Needs a re-enroll. |
+| `rpc_error` | Anything else: CP unreachable, transport error, CP internal error, CP without CA. |
+| `load_cert`, `build_csr`, `empty_response`, `write_cert` | Local failures on the agent. |
+
+- **Alert (warn)**: `increase(firefik_agent_cert_renew_failed_total{reason=~"rpc_error|denied"}[2h]) > 0`.
+  With default settings every reason stays at 0 during a healthy
+  cycle, so no filter is needed.
+- `outside_window` above 0 means CP `--renew-window` < agent
+  renew-before. Fix the config (see
+  [control-plane.md](control-plane.md#renew-window)).
 
 ---
 

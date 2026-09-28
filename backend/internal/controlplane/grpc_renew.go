@@ -18,8 +18,9 @@ import (
 )
 
 const (
-	defaultRenewWindow      = 24 * time.Hour
+	DefaultRenewWindow      = 72 * time.Hour
 	defaultMinRenewInterval = 5 * time.Minute
+	renewWindowMarker       = "; renew window is "
 )
 
 type CertAuthority interface {
@@ -90,13 +91,13 @@ func (s *GRPCServer) RenewCert(ctx context.Context, req *pb.RenewCertRequest) (*
 	now := time.Now()
 	window := s.RenewWindow
 	if window <= 0 {
-		window = defaultRenewWindow
+		window = DefaultRenewWindow
 	}
 	if peerCert.NotAfter.Sub(now) > window {
 		IncRenewRejected("outside_renewal_window")
 		return nil, status.Error(codes.FailedPrecondition,
 			"certificate valid for "+peerCert.NotAfter.Sub(now).Truncate(time.Second).String()+
-				"; renew window is "+window.String())
+				renewWindowMarker+window.String())
 	}
 
 	minInterval := s.MinRenewInterval

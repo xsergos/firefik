@@ -61,6 +61,12 @@ HTTP `/v1/enroll` endpoint.
 > The HTTP listener no longer carries `/v1/renew`. Renewal is a unary
 > gRPC RPC `ControlPlane.RenewCert` on `:8444` with mTLS verification
 > + per-cert rate-limit (`--min-renew-interval`).
+>
+> `--renew-window` / `FIREFIK_CP_CERT_RENEW_WINDOW` (seconds or a Go
+> duration, default 72h) is how close to expiry a cert must be before
+> `RenewCert` accepts it. Keep it ≥ the agent
+> `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE` (default 72h); the server
+> logs a warning at startup when it is below 72h.
 
 ## Agent integration
 
@@ -72,7 +78,7 @@ Agents (firefik-back) opt in by setting:
 - `FIREFIK_CONTROL_PLANE_CLIENT_CERT=/etc/firefik/client.crt`
 - `FIREFIK_CONTROL_PLANE_CLIENT_KEY=/etc/firefik/client.key`
 - `FIREFIK_CONTROL_PLANE_TOKEN=…` (optional; bearer for non-RenewCert RPCs)
-- `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE=259200` (default 72h, in seconds)
+- `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE=259200` (default 72h, in seconds; must be ≤ server `--renew-window`)
 - `FIREFIK_CONTROL_PLANE_CERT_RENEW_INTERVAL=1800` (default 30m, in seconds)
 - `FIREFIK_CONTROL_PLANE_CERT_RENEW_TTL=2592000` (default 720h, in seconds)
 

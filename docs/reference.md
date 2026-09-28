@@ -156,6 +156,9 @@ Columns:
 | `FIREFIK_CONTROL_PLANE_HEARTBEAT_INTERVAL` | `30` | int (sec) | agent | | gRPC keep-alive. |
 | `FIREFIK_CONTROL_PLANE_INSTANCE_ID` | `(hostname)` | string | agent | | Advertised agent-id. |
 | `FIREFIK_CONTROL_PLANE_HTTP` | — | string | agent | | `https://host:port` of firefik-server's HTTP API. Empty = templates / approvals UI proxy disabled. |
+| `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE` | `259200` | int (sec) | agent | | Start self-renewal when the client cert has less than this left (72h). Must be ≤ server `FIREFIK_CP_CERT_RENEW_WINDOW`. |
+| `FIREFIK_CONTROL_PLANE_CERT_RENEW_INTERVAL` | `1800` | int (sec) | agent | | Renewal check period. |
+| `FIREFIK_CONTROL_PLANE_CERT_RENEW_TTL` | `2592000` | int (sec) | agent | | Requested TTL of the renewed cert (720h). |
 | `FIREFIK_TEMPLATE_SYNC_INTERVAL` | `60` | int (sec) | agent | | Pull policy templates every N seconds. |
 | `FIREFIK_TEMPLATE_CACHE_DIR` | `/var/lib/firefik/templates` | path | agent | | On-disk cache for synced templates (JSON files per template). |
 
@@ -167,6 +170,7 @@ Columns:
 | `FIREFIK_CP_DB` | `/var/lib/firefik-server/firefik.db` | path | server | | SQLite file; `:memory:` for tests. |
 | `FIREFIK_CP_TRUST_DOMAIN` | — | string | server | | SPIFFE trust domain (`spiffe://...`). |
 | `FIREFIK_CP_CA_DIR` | — | path | server | | Mini-CA state directory. |
+| `FIREFIK_CP_CERT_RENEW_WINDOW` | `259200` | int (sec) or duration | server | | `RenewCert` accepts a cert only within this time of expiry (72h). Keep ≥ agent `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE`. |
 
 ---
 
@@ -221,6 +225,8 @@ for flags.
 | `--audit-retention` | `2160h` (90d) | Audit row retention |
 | `--snapshots-per-agent` | `100` | Per-agent snapshot cap |
 | `--retention-interval` | `15m` | Retention loop period |
+| `--renew-window` | `$FIREFIK_CP_CERT_RENEW_WINDOW` (`72h`) | `RenewCert` rejects certs with more than this left; keep ≥ agent renew-before |
+| `--min-renew-interval` | `5m` | Rate limit between two `RenewCert` calls from one cert serial |
 
 ---
 

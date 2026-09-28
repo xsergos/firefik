@@ -123,7 +123,7 @@ agent (CertRenewer)                     firefik-server (gRPC)
                                               tls.RequireAndVerifyClientCert + SPIFFE check
                                               extract agent_id from peer SAN
                                               reject if revoked.json contains peer serial
-                                              reject if remaining > renew-window (default 24h)
+                                              reject if remaining > renew-window (default 72h)
                                               reject if peer serial saw a renew within
                                                  min-renew-interval (default 5m)
                                               parse CSR; require csr.pubkey == peer.pubkey
@@ -156,6 +156,21 @@ Key properties:
   --serial <hex>` writes to `<state-dir>/revoked.json`; subsequent
   `RenewCert` from that cert returns `PermissionDenied` + the
   `cert_renew_rejected` audit event.
+- <a id="renew-window"></a>**Renew window.** Two settings control when
+  a cert is renewed:
+  - agent `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE` (seconds, default
+    `259200` = 72h): the agent starts calling `RenewCert` once the cert
+    has less than this left;
+  - server `--renew-window` / `FIREFIK_CP_CERT_RENEW_WINDOW` (seconds
+    or a Go duration, default 72h): `RenewCert` is rejected with
+    `FailedPrecondition` while the peer cert has more than this left.
+
+  **Rule: CP window ≥ agent renew-before.** With the defaults the agent
+  renews on its first tick below 72h. If the CP window is shorter, the
+  first attempt fails with `reason="outside_window"`, the agent reads
+  the window from the error, waits until the cert is inside it and
+  resets after the next successful renewal. The server logs a warning
+  at startup when its window is below the 72h agent default.
 - **Rate-limit per peer serial.** `--min-renew-interval` (default 5m)
   prevents a buggy or runaway agent from hot-looping the issuing path.
   The server records `{ peer_serial → last_renew_at }` in the SQLite
