@@ -11,30 +11,10 @@
 # dead weight; delete it. OSV and trivy's DB are not identical, so confirm on
 # the next CI run — the docker-images job scans with exit-code 0 and prints the
 # full HIGH/CRITICAL table.
-
-# === caddy gobinary, frontend + panel images ==================================
 #
-# Caddy v2.11.4 binary embeds these third-party libs at the versions caddy's
-# go.mod pinned. The vulnerable code paths are NOT reachable in our
-# `frontend/Caddyfile.panel`:
-#
-#   * `auto_https off` — no ACME / no internal CA / no smallstep SCEP;
-#   * no Caddy OTel telemetry exporter enabled;
-#   * no gRPC reverse-proxy modules;
-#   * no ACME-DNS challenge and no custom `resolvers` — x/net dnsmessage
-#     wire-parsing not exercised;
-#   * static `file_server` + HTTP `reverse_proxy` only — no language matchers
-#     or x/text encoding on the request path.
-#
-# Caddy upstream ships these libs in their binary regardless of whether the
-# affected modules are loaded; we accept the trivy noise until caddy releases a
-# binary built against patched deps. v2.11.4 (2026-06-03) is still the newest
-# release as of 2026-09-04, so none of the five below can be cleared yet.
-# Followup: bump caddy on every upstream release, then re-run the audit above.
-
-CVE-2026-46600        # HIGH x/net v0.55.0 — dnsmessage DoS; no ACME-DNS / no custom resolvers, DNS wire-parsing unreachable.
-CVE-2026-56852        # HIGH x/text v0.37.0 — UTF-8 DoS; no language matchers / x/text encoding on static+proxy request path.
-GHSA-hrxh-6v49-42gf   # HIGH grpc-go v1.81.0 (fix 1.82.1) — xDS RBAC + HTTP/2; no gRPC modules, caddy HTTP/2 server is x/net/http2, not grpc-go.
-CVE-2026-56854        # CRITICAL x/crypto v0.52.0 (fix 0.55.0) — flaw is in golang.org/x/crypto/ssh; caddy standard build has no SSH server or client module, x/crypto is linked for TLS/ACME only.
-CVE-2026-84304        # HIGH grpc-go v1.81.0 (fix 1.83.1) — caddy gRPC modules not loaded; panel serves static files + HTTP reverse_proxy only. Our own backend already runs grpc v1.83.2.
-CVE-2026-84445        # HIGH grpc-go v1.81.0 (fix 1.82.2) — DoS against gRPC-Go xDS servers; caddy runs no xDS server and loads no gRPC modules. Our own backend already runs grpc v1.83.2.
+# No entries as of 2026-10-06. Caddy v2.11.7 pins x/net v0.59.0, x/text
+# v0.42.0, x/crypto v0.57.0 and grpc v1.83.2, which clears all six entries
+# carried for v2.11.4 (CVE-2026-46600, CVE-2026-56852, GHSA-hrxh-6v49-42gf,
+# CVE-2026-56854, CVE-2026-84304, CVE-2026-84445). The only OSV hit left in
+# caddy's go.mod is GO-2026-5932 (x/crypto/openpgp unmaintained), which has no
+# CVE/GHSA alias and is not reported by trivy.

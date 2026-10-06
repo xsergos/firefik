@@ -13,7 +13,7 @@ COPY . .
 RUN npm run build
 
 FROM golang:1.27.1-alpine AS caddy-build
-ARG CADDY_VERSION=v2.11.4
+ARG CADDY_VERSION=v2.11.7
 RUN apk add --no-cache git
 ENV CGO_ENABLED=0
 RUN go install -trimpath -ldflags="-s -w" \

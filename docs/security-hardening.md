@@ -352,8 +352,9 @@ Map firefik audit fields to your SIEM:
   whose code paths our `Caddyfile.panel` never reaches (`auto_https off`,
   no JWT/auth, no OTel exporter, no gRPC reverse-proxy). Each entry
   carries severity, justification, and a follow-up note; re-evaluated
-  on every caddy bump. Frontend image now builds caddy from source
-  against Go 1.26.2 to remove all stdlib CVEs at the binary level.
+  on every caddy bump; the list is empty when nothing needs accepting.
+  The frontend image builds caddy from source with the same Go toolchain
+  image as the backend, so stdlib CVEs are fixed at the binary level.
 
 ---
 
