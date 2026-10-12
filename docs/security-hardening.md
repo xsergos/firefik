@@ -350,7 +350,8 @@ Map firefik audit fields to your SIEM:
   CVE IDs explicitly assessed as not exploitable in this deployment —
   typically vulnerable libraries embedded in the upstream caddy binary
   whose code paths our `Caddyfile.panel` never reaches (`auto_https off`,
-  no JWT/auth, no OTel exporter, no gRPC reverse-proxy). Each entry
+  `protocols h1` so the `x/net/http2` server is never configured, no
+  JWT/auth, no OTel exporter, no gRPC reverse-proxy). Each entry
   carries severity, justification, and a follow-up note; re-evaluated
   on every caddy bump; the list is empty when nothing needs accepting.
   The frontend image builds caddy from source with the same Go toolchain
