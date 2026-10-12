@@ -12,9 +12,25 @@
 # the next CI run — the docker-images job scans with exit-code 0 and prints the
 # full HIGH/CRITICAL table.
 #
-# No entries as of 2026-10-06. Caddy v2.11.7 pins x/net v0.59.0, x/text
-# v0.42.0, x/crypto v0.57.0 and grpc v1.83.2, which clears all six entries
-# carried for v2.11.4 (CVE-2026-46600, CVE-2026-56852, GHSA-hrxh-6v49-42gf,
-# CVE-2026-56854, CVE-2026-84304, CVE-2026-84445). The only OSV hit left in
-# caddy's go.mod is GO-2026-5932 (x/crypto/openpgp unmaintained), which has no
-# CVE/GHSA alias and is not reported by trivy.
+# Caddy v2.11.7 (2026-10-06) cleared all six entries carried for v2.11.4.
+# GO-2026-5932 (x/crypto/openpgp unmaintained) has no CVE/GHSA alias and is
+# not reported by trivy.
+
+# === caddy gobinary, frontend + panel images ==================================
+#
+# Caddy v2.11.7 pins x/net v0.59.0. Go 1.27.2 / x/net v0.60.0 (2026-10-08)
+# fixed five HTTP/2 flaws (GO-2026-6603, -6610, -6611, -6612, -6617); trivy
+# reports only CVE-2026-78669 at HIGH. Our image builds caddy with Go 1.27.2,
+# so the stdlib copy is fixed; the x/net copy is not reachable:
+#
+#   * both Caddyfiles set `servers { protocols h1 }`, so caddy never calls
+#     x/net `http2.ConfigureServer` and serves no HTTP/2 or h2c;
+#   * `frontend/Caddyfile` proxies to a plain-HTTP unix socket, where the
+#     x/net HTTP/2 transport is never negotiated;
+#   * `frontend/Caddyfile.panel` proxies over TLS only to our own control
+#     plane, the only peer that could send hostile SETTINGS frames.
+#
+# Followup: caddy master already has x/net v0.60.0 (caddyserver/caddy#8179);
+# drop this entry once a caddy release after v2.11.7 ships with it.
+
+CVE-2026-78669        # HIGH x/net v0.59.0 (fix 0.60.0) — HTTP/2 SETTINGS initial-window CPU DoS; caddy HTTP/2 server disabled (protocols h1), client side talks only to our own CP.
