@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:26.12.0-alpine AS frontend-build
+FROM node:26.12.1-alpine AS frontend-build
 WORKDIR /app
 
 ARG VITE_PANEL_MODE=
