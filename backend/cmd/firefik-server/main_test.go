@@ -151,10 +151,10 @@ func TestBuildTLSConfigsWithTrustDomain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
-	if grpcCfg.VerifyPeerCertificate == nil {
-		t.Error("expected VerifyPeerCertificate set when trust-domain present")
+	if grpcCfg.VerifyConnection == nil {
+		t.Fatal("expected VerifyConnection set when trust-domain present")
 	}
-	if err := grpcCfg.VerifyPeerCertificate(nil, nil); err == nil {
+	if err := grpcCfg.VerifyConnection(tls.ConnectionState{}); err == nil {
 		t.Errorf("expected error from empty rawCerts")
 	}
 }

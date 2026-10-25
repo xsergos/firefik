@@ -509,8 +509,12 @@ func buildTLSConfigs(cert, key, clientCA, trustDomain string, ca *mca.CA) (*tls.
 
 	if trustDomain != "" {
 		base := mca.VerifySPIFFEPeer(trustDomain)
-		grpcCfg.VerifyPeerCertificate = func(rawCerts [][]byte, chains [][]*x509.Certificate) error {
-			if err := base(rawCerts, chains); err != nil {
+		grpcCfg.VerifyConnection = func(cs tls.ConnectionState) error {
+			rawCerts := make([][]byte, 0, len(cs.PeerCertificates))
+			for _, c := range cs.PeerCertificates {
+				rawCerts = append(rawCerts, c.Raw)
+			}
+			if err := base(rawCerts, cs.VerifiedChains); err != nil {
 				reason := "no_spiffe_san"
 				if len(rawCerts) == 0 {
 					reason = "no_peer_cert"
