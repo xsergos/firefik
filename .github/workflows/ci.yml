@@ -31,7 +31,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           cache-dependency-path: backend/go.sum
 
       - name: go vet
@@ -58,7 +58,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           cache-dependency-path: backend/go.sum
 
       - name: Cache Go tool binaries
@@ -70,7 +70,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.14.0
+          version: v2.15.0
           working-directory: backend
           args: --timeout=5m
 
@@ -108,7 +108,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.27.2"
+          go-version: "1.27.3"
           cache-dependency-path: backend/go.sum
 
       - name: Install iptables-nft and nftables

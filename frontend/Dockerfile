@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:26.11.1-alpine AS frontend-build
+FROM node:26.12.0-alpine AS frontend-build
 WORKDIR /app
 
 ARG VITE_PANEL_MODE=
@@ -12,14 +12,14 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM golang:1.27.2-alpine AS caddy-build
+FROM golang:1.27.3-alpine AS caddy-build
 ARG CADDY_VERSION=v2.11.7
 RUN apk add --no-cache git
 ENV CGO_ENABLED=0
 RUN go install -trimpath -ldflags="-s -w" \
     github.com/caddyserver/caddy/v2/cmd/caddy@${CADDY_VERSION}
 
-FROM alpine:3.24.2 AS runtime
+FROM alpine:3.24.3 AS runtime
 ARG CADDY_CONFIG=Caddyfile
 RUN apk add --no-cache wget ca-certificates \
     && apk upgrade --no-cache \

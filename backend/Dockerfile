@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM golang:1.27.2-alpine AS builder
+FROM golang:1.27.3-alpine AS builder
 WORKDIR /app
 
 RUN apk add --no-cache iptables-dev build-base git
@@ -23,7 +23,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w" \
     -o firefik-server ./cmd/firefik-server
 
-FROM alpine:3.24.2 AS runtime
+FROM alpine:3.24.3 AS runtime
 
 RUN apk add --no-cache iptables ip6tables nftables wget ca-certificates tzdata \
     && apk upgrade --no-cache \
