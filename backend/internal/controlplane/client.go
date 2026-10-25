@@ -57,7 +57,7 @@ type RenewGRPCDialConfig struct {
 }
 
 func DialRenewClient(cfg RenewGRPCDialConfig) (pb.ControlPlaneClient, *grpc.ClientConn, error) {
-	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: cfg.Insecure}
+	tlsCfg := &tls.Config{MinVersion: tls.VersionTLS12, InsecureSkipVerify: cfg.Insecure} // #nosec G402 -- explicit operator opt-in flag
 	if cfg.CAPath != "" {
 		caPEM, err := os.ReadFile(cfg.CAPath)
 		if err != nil {

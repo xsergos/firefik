@@ -367,7 +367,7 @@ func (b *NFTablesBackend) addPerSourceLimitRules(
 			Type:  expr.LimitTypePkts,
 			Rate:  uint64(rl.Rate),
 			Unit:  expr.LimitTimeSecond,
-			Burst: uint32(rl.Burst),
+			Burst: uint32(rl.Burst), // #nosec G115 -- burst is parsed as 32-bit and capped at MaxUint32
 		}},
 	})
 	acceptExprs = append(acceptExprs, &expr.Counter{}, &expr.Verdict{Kind: expr.VerdictAccept})

@@ -325,7 +325,7 @@ func nextBackoff(d time.Duration) time.Duration {
 
 func jitter(d time.Duration) time.Duration {
 	delta := float64(d) * backoffJitterPc
-	offset := (rand.Float64()*2 - 1) * delta
+	offset := (rand.Float64()*2 - 1) * delta // #nosec G404 -- backoff jitter, not a secret
 	out := time.Duration(float64(d) + offset)
 	if out < backoffMin {
 		return backoffMin
@@ -354,7 +354,7 @@ func toPBSnapshot(in AgentSnapshot) *pb.AgentSnapshot {
 			FirewallStatus: c.FirewallStatus,
 			DefaultPolicy:  c.DefaultPolicy,
 			Labels:         copyLabels(c.Labels),
-			RuleSetCount:   int32(c.RuleSetCount),
+			RuleSetCount:   int32(c.RuleSetCount), // #nosec G115 -- rule set count is far below MaxInt32
 			Sources:        append([]string(nil), c.Sources...),
 		})
 	}

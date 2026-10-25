@@ -209,7 +209,7 @@ func (s *Server) Run(ctx context.Context) error {
 		defer metricsCleanup()
 	}
 
-	go func() {
+	go func() { // #nosec G118 -- shutdown must outlive the cancelled serve context
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()

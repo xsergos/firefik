@@ -162,7 +162,7 @@ func (l *AgentLoop) snapshotTicker(ctx context.Context, grpcClient *GRPCClient) 
 func buildClientTLS(insecureSkipVerify bool, caPath, certPath, keyPath string) (*tls.Config, error) {
 	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
 	if insecureSkipVerify {
-		cfg.InsecureSkipVerify = true
+		cfg.InsecureSkipVerify = true // #nosec G402 -- explicit operator opt-in flag
 	}
 	if caPath != "" {
 		pem, err := os.ReadFile(caPath)

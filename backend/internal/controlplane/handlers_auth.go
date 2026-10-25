@@ -79,7 +79,7 @@ func (s *HTTPServer) handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure follows the request transport so plain-HTTP panels keep working
 		Name:     sessionCookieName,
 		Value:    sess.ID,
 		Path:     "/",
@@ -107,7 +107,7 @@ func (s *HTTPServer) handleLogout(w http.ResponseWriter, r *http.Request) {
 			s.Sessions.Revoke(c.Value)
 		}
 	}
-	http.SetCookie(w, &http.Cookie{
+	http.SetCookie(w, &http.Cookie{ // #nosec G124 -- Secure follows the request transport so plain-HTTP panels keep working
 		Name:     sessionCookieName,
 		Value:    "",
 		Path:     "/",

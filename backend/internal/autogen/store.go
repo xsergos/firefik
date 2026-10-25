@@ -175,7 +175,7 @@ func (s *sqliteStore) SnapshotByContainer(ctx context.Context, cid string) (Cont
 		if err := rows.Scan(&proto, &port, &peer, &count, &first, &last); err != nil {
 			return out, err
 		}
-		key := proto + "/" + portKey(uint16(port))
+		key := proto + "/" + portKey(uint16(port)) // #nosec G115 -- column is written from a uint16 port
 		if p, ok := out.Ports[key]; ok {
 			p.Count += count
 			if last.After(p.LastAt) {
@@ -186,7 +186,7 @@ func (s *sqliteStore) SnapshotByContainer(ctx context.Context, cid string) (Cont
 			}
 		} else {
 			out.Ports[key] = &PortObservation{
-				Protocol: proto, Port: uint16(port), Count: count,
+				Protocol: proto, Port: uint16(port), Count: count, // #nosec G115 -- column is written from a uint16 port
 				FirstAt: first, LastAt: last,
 			}
 		}
@@ -236,9 +236,9 @@ func (s *sqliteStore) Snapshot(ctx context.Context) (map[string]ContainerObserva
 				Peers: map[string]*PeerObservation{},
 			}
 		}
-		key := proto + "/" + portKey(uint16(port))
+		key := proto + "/" + portKey(uint16(port)) // #nosec G115 -- column is written from a uint16 port
 		co.Ports[key] = &PortObservation{
-			Protocol: proto, Port: uint16(port), Count: count,
+			Protocol: proto, Port: uint16(port), Count: count, // #nosec G115 -- column is written from a uint16 port
 			FirstAt: first, LastAt: last,
 		}
 		if peer != "" {
@@ -282,7 +282,7 @@ func (s *sqliteStore) ListProposals(ctx context.Context, statuses ...ProposalSta
 			placeholders = append(placeholders, "?")
 			args = append(args, string(s))
 		}
-		query += " WHERE status IN (" + strings.Join(placeholders, ",") + ")"
+		query += " WHERE status IN (" + strings.Join(placeholders, ",") + ")" // #nosec G202 -- only ? placeholders are concatenated
 	}
 	query += " ORDER BY generated_at DESC"
 	rows, err := s.db.QueryContext(ctx, query, args...)

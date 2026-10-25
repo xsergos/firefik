@@ -344,6 +344,12 @@ Map firefik audit fields to your SIEM:
 
 - **Verify.** Release CI runs `govulncheck`, `gosec`, `trivy` (HIGH /
   CRITICAL gate, fails the release on any unignored finding).
+- **gosec exclusions.** CI skips generated code and these rules:
+  `G104` (errcheck in golangci-lint covers it), `G304` / `G703` (every
+  read or written path comes from operator config or flags), and
+  `G301` / `G302` / `G306` (certificates, CA bundles and GeoIP data are
+  world-readable by design, audit logs are `0640`, private keys `0600`). The remaining
+  findings carry a `#nosec <rule> -- <reason>` annotation on the line.
 - **Remediate.** Re-scan production image weekly via
   `trivy image ghcr.io/.../firefik-back:v0.11.0`.
 - **Accepted findings (`.trivyignore`).** Repo-root ignore list with

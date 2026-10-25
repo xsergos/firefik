@@ -72,7 +72,7 @@ func openMetricsSource(source, token string, insecure bool, timeout time.Duratio
 	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
 		client := &http.Client{Timeout: timeout}
 		if insecure {
-			client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+			client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // #nosec G402 -- explicit operator opt-in flag
 		}
 		req, err := http.NewRequest(http.MethodGet, source, nil)
 		if err != nil {

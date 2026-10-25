@@ -383,7 +383,7 @@ func ipToUint32(ip net.IP) uint32 {
 }
 
 func uint32ToIP(n uint32) net.IP {
-	return net.IP{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
+	return net.IP{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)} // #nosec G115 -- intentional octet extraction
 }
 
 func splitTrimmed(s string) []string {

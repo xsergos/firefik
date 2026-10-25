@@ -268,7 +268,7 @@ func checkParentChain(g *globalFlags) doctorCheck {
 		if _, err := exec.LookPath("iptables"); err != nil {
 			return doctorCheck{Name: "parent-chain", Pass: false, Detail: "iptables binary missing"}
 		}
-		out, err := exec.Command("iptables", "-nL", g.parent).Output()
+		out, err := exec.Command("iptables", "-nL", g.parent).Output() // #nosec G204 -- fixed binary, chain name from local config
 		if err != nil {
 			return doctorCheck{
 				Name:   "parent-chain",

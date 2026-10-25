@@ -221,7 +221,7 @@ func run(logger *slog.Logger) error {
 				observer.Record(autogen.Flow{
 					ContainerID: dstCID,
 					Protocol:    strings.ToLower(ev.Proto),
-					Port:        uint16(ev.DstPort),
+					Port:        uint16(ev.DstPort), // #nosec G115 -- decoded from a 16-bit packet header field
 					PeerIP:      ev.SrcIP,
 				})
 				rules.AutogenRecordedTotal.Inc()
@@ -229,7 +229,7 @@ func run(logger *slog.Logger) error {
 				observer.Record(autogen.Flow{
 					ContainerID: srcCID,
 					Protocol:    strings.ToLower(ev.Proto),
-					Port:        uint16(ev.DstPort),
+					Port:        uint16(ev.DstPort), // #nosec G115 -- decoded from a 16-bit packet header field
 					PeerIP:      ev.DstIP,
 				})
 				rules.AutogenRecordedTotal.Inc()

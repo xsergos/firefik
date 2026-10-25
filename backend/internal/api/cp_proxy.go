@@ -25,7 +25,7 @@ func NewControlPlaneProxy(baseURL, token, caFile string, insecure bool) (*Contro
 	if baseURL == "" {
 		return nil, errors.New("control-plane HTTP base URL not set")
 	}
-	tlsCfg := &tls.Config{InsecureSkipVerify: insecure}
+	tlsCfg := &tls.Config{InsecureSkipVerify: insecure} // #nosec G402 -- explicit operator opt-in flag
 	if caFile != "" {
 		pem, err := os.ReadFile(caFile)
 		if err != nil {

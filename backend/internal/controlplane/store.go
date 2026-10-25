@@ -307,7 +307,7 @@ func (s *sqliteStore) TakeCommands(ctx context.Context, agentID string) ([]Comma
 		args = append(args, id)
 	}
 	_, err = s.db.ExecContext(ctx,
-		"UPDATE commands SET delivered_at = ? WHERE id IN ("+placeholders+")",
+		"UPDATE commands SET delivered_at = ? WHERE id IN ("+placeholders+")", // #nosec G202 -- only ? placeholders are concatenated
 		args...,
 	)
 	return out, err
