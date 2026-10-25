@@ -59,6 +59,7 @@ func TestParseRatelimitLenient(t *testing.T) {
 		"100/s":         {true, 100, 200},
 		"50":            {true, 50, 100},
 		"30/s,burst=60": {true, 30, 60},
+		"4294967295/s":  {true, 4294967295, 4294967295},
 		"":              {false, 0, 0},
 		"abc":           {false, 0, 0},
 	}

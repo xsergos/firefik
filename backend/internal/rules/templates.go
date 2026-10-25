@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -143,7 +144,7 @@ func parseRatelimitLenient(s string) *docker.RateLimitConfig {
 		return nil
 	}
 	if burst == 0 {
-		burst = uint(n) * 2
+		burst = min(uint(n)*2, math.MaxUint32)
 	}
 	return &docker.RateLimitConfig{Rate: uint(n), Burst: burst}
 }
