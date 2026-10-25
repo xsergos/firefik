@@ -120,7 +120,11 @@ func applyCompare(rs *docker.FirewallRuleSet, c CompareExpr) error {
 		if c.Op != "==" {
 			return fmt.Errorf("port compare only supports ==; use `in [...]` for ranges")
 		}
-		rs.Ports = append(rs.Ports, uint16(c.Value.Num))
+		p, err := portNum(c.Value.Num)
+		if err != nil {
+			return err
+		}
+		rs.Ports = append(rs.Ports, p)
 	case "src_ip":
 		if !c.Value.IsStr {
 			return fmt.Errorf("src_ip expects string value")
@@ -170,7 +174,11 @@ func applyIn(rs *docker.FirewallRuleSet, c InExpr) error {
 			if !v.IsNum {
 				return fmt.Errorf("port list expects integers")
 			}
-			rs.Ports = append(rs.Ports, uint16(v.Num))
+			p, err := portNum(v.Num)
+			if err != nil {
+				return err
+			}
+			rs.Ports = append(rs.Ports, p)
 		}
 	case "geo":
 		codes := make([]string, 0, len(c.Values))
@@ -189,6 +197,13 @@ func applyIn(rs *docker.FirewallRuleSet, c InExpr) error {
 		return fmt.Errorf("`in` on field %q not supported", c.Field)
 	}
 	return nil
+}
+
+func portNum(n int64) (uint16, error) {
+	if n < 1 || n > 65535 {
+		return 0, fmt.Errorf("port %d out of range 1-65535", n)
+	}
+	return uint16(n), nil
 }
 
 func parseCIDR(s string) (*net.IPNet, error) {

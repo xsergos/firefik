@@ -110,6 +110,25 @@ func TestApplyCompare_PortAppends(t *testing.T) {
 	}
 }
 
+func TestApplyPort_OutOfRange(t *testing.T) {
+	for _, n := range []int64{0, -1, 65536, 70000} {
+		rs := docker.FirewallRuleSet{}
+		if err := applyCompare(&rs, CompareExpr{Field: "port", Op: "==", Value: Value{IsNum: true, Num: n}}); err == nil {
+			t.Errorf("compare: expected error for port %d, got ports=%v", n, rs.Ports)
+		}
+		if err := applyIn(&rs, InExpr{Field: "port", Values: []Value{{IsNum: true, Num: 80}, {IsNum: true, Num: n}}}); err == nil {
+			t.Errorf("in: expected error for port %d, got ports=%v", n, rs.Ports)
+		}
+	}
+	rs := docker.FirewallRuleSet{}
+	if err := applyIn(&rs, InExpr{Field: "port", Values: []Value{{IsNum: true, Num: 1}, {IsNum: true, Num: 65535}}}); err != nil {
+		t.Fatalf("unexpected: %v", err)
+	}
+	if len(rs.Ports) != 2 || rs.Ports[0] != 1 || rs.Ports[1] != 65535 {
+		t.Errorf("ports=%v", rs.Ports)
+	}
+}
+
 func TestApplyCompare_SrcIPAllowAndBlock(t *testing.T) {
 	rs := docker.FirewallRuleSet{}
 	if err := applyCompare(&rs, CompareExpr{Field: "src_ip", Op: "==", Value: Value{IsStr: true, Str: "10.0.0.1"}}); err != nil {
