@@ -14,7 +14,8 @@
 #
 # Caddy v2.11.7 (2026-10-06) cleared all six entries carried for v2.11.4.
 # GO-2026-5932 (x/crypto/openpgp unmaintained) has no CVE/GHSA alias and is
-# not reported by trivy.
+# not reported by trivy. GHSA-j6qf-3m9c-vwj3 (chi v5.3.2 ClientIPFromXFF, fix
+# 5.4.0) is MEDIUM, below the release gate, and caddy does not call it.
 
 # === caddy gobinary, frontend + panel images ==================================
 #
