@@ -93,7 +93,7 @@ jobs:
           govulncheck ./...
 
       - name: gosec
-        uses: securego/gosec@4504603eddc5a91a7b7713932d6d1d3792126103
+        uses: securego/gosec@a7abd50b2947e53b26a7e200223e635ce36fac9b
         with:
           args: -quiet -exclude=G104,G301,G302,G304,G306,G703 -exclude-generated -exclude-dir=cmd/firefik/testdata ./backend/...
 
