@@ -12,41 +12,28 @@
 # the next CI run — the docker-images job scans with exit-code 0 and prints the
 # full HIGH/CRITICAL table.
 #
-# Caddy v2.11.7 (2026-10-06) cleared all six entries carried for v2.11.4.
-# GO-2026-5932 (x/crypto/openpgp unmaintained) has no CVE/GHSA alias and is
-# not reported by trivy. GHSA-j6qf-3m9c-vwj3 (chi v5.3.2 ClientIPFromXFF, fix
-# 5.4.0) is MEDIUM, below the release gate, and caddy does not call it.
-# GHSA-4w3g-jfj2-cw2q and GHSA-vvm8-gf78-28g4 (go-jose panics, fix v4.1.5) are
-# MODERATE; GO-2026-6860 / GO-2026-6866 (x/net html, fix 0.62.0) carry no
-# severity. All are below the release gate.
+# Caddy v2.11.9 (2026-11-05) ships x/net v0.60.0 and go-jose v4.1.6, which
+# cleared the x/net HTTP/2 entry (CVE-2026-78669) carried for v2.11.7. OSV
+# still lists for v2.11.9, none of them reported by trivy:
+#
+#   * GO-2026-5932 (x/crypto/openpgp unmaintained) has no CVE/GHSA alias.
+#   * GO-2026-6860 / GO-2026-6866 (x/net v0.60.0 html, fix 0.62.0). govulncheck
+#     on cmd/caddy finds x/net/html linked but never called.
+#   * GO-2026-6865 (klauspost/compress v1.20.1, fix 1.20.2): the zstd decoder
+#     panics on a crafted frame. Caddy only encodes responses with zstd and
+#     never decodes untrusted zstd input.
+#   * GHSA-4w3g-jfj2-cw2q and GHSA-vvm8-gf78-28g4 (go-jose v3.0.5 panics) are
+#     MODERATE, below the release gate.
 
 # === caddy gobinary, frontend + panel images ==================================
 #
-# Caddy v2.11.7 pins x/net v0.59.0. Go 1.27.2 / x/net v0.60.0 (2026-10-08)
-# fixed five HTTP/2 flaws (GO-2026-6603, -6610, -6611, -6612, -6617); trivy
-# reports only CVE-2026-78669 at HIGH. Our image builds caddy with Go 1.27.3,
-# so the stdlib copy is fixed; the x/net copy is not reachable:
-#
-#   * both Caddyfiles set `servers { protocols h1 }`, so caddy never calls
-#     x/net `http2.ConfigureServer` and serves no HTTP/2 or h2c;
-#   * `frontend/Caddyfile` proxies to a plain-HTTP unix socket, where the
-#     x/net HTTP/2 transport is never negotiated;
-#   * `frontend/Caddyfile.panel` proxies over TLS only to our own control
-#     plane, the only peer that could send hostile SETTINGS frames.
-#
-# Followup: caddy master already has x/net v0.60.0 (caddyserver/caddy#8179);
-# drop this entry once a caddy release after v2.11.7 ships with it.
-
-CVE-2026-78669        # HIGH x/net v0.59.0 (fix 0.60.0) — HTTP/2 SETTINGS initial-window CPU DoS; caddy HTTP/2 server disabled (protocols h1), client side talks only to our own CP.
-
-# Caddy v2.11.7 pins go-jose v4.1.5 and v3.0.5. GHSA-mgcc-cww5-fp2q
-# (2026-10-27) is a CPU DoS when parsing a JWK that holds an RSA key; v4 is
-# fixed in 4.1.6, v3 has no fix. Caddy reaches go-jose only through the
+# Caddy v2.11.9 pins go-jose v4.1.6 (fixed) and still pulls in v3.0.5 through
+# smallstep. GHSA-mgcc-cww5-fp2q (2026-10-27) is a CPU DoS when parsing a JWK
+# that holds an RSA key; v3 has no fix. Caddy reaches go-jose only through the
 # smallstep CA code behind the `acme_server` handler and the `pki` app, which
 # parse JWKs sent by ACME clients. Neither Caddyfile configures them and both
 # set `auto_https off`, so no untrusted JWK is ever parsed.
 #
-# Followup: drop this entry once a caddy release ships go-jose v4 >= 4.1.6 and
-# no longer pulls in v3.
+# Followup: drop this entry once a caddy release no longer pulls in go-jose v3.
 
-CVE-2026-116587       # HIGH go-jose v4.1.5/v3.0.5 (fix 4.1.6 / none) — RSA JWK parse DoS; caddy has no acme_server or pki configured, never parses untrusted JWKs.
+CVE-2026-116587       # HIGH go-jose v3.0.5 (no fix) — RSA JWK parse DoS; caddy has no acme_server or pki configured, never parses untrusted JWKs.
