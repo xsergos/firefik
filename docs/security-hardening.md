@@ -350,6 +350,12 @@ Map firefik audit fields to your SIEM:
   `G301` / `G302` / `G306` (certificates, CA bundles and GeoIP data are
   world-readable by design, audit logs are `0640`, private keys `0600`). The remaining
   findings carry a `#nosec <rule> -- <reason>` annotation on the line.
+- **gosec pin.** The action's release tags have pointed at the previous
+  release's image, so CI pins the gosec action by commit SHA and reads the
+  image digest from that commit's `action.yml`. Dependabot ignores
+  `securego/gosec` because every master commit would open a PR with the
+  same image; bump the SHA by hand when a new gosec release ships a new
+  image.
 - **Remediate.** Re-scan production image weekly via
   `trivy image ghcr.io/.../firefik-back:v0.11.0`.
 - **Accepted findings (`.trivyignore`).** Repo-root ignore list with

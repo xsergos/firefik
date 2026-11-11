@@ -41,3 +41,5 @@ updates:
     labels:
       - dependencies
       - ci
+    ignore:
+      - dependency-name: securego/gosec
