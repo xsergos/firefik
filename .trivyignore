@@ -14,11 +14,11 @@
 #
 # Caddy v2.11.9 (2026-11-05) ships x/net v0.60.0 and go-jose v4.1.6, which
 # cleared the x/net HTTP/2 entry (CVE-2026-78669) carried for v2.11.7. OSV
-# still lists for v2.11.9, none of them reported by trivy:
+# still lists for v2.11.9, not reported by trivy:
 #
 #   * GO-2026-5932 (x/crypto/openpgp unmaintained) has no CVE/GHSA alias.
-#   * GO-2026-6860 / GO-2026-6866 (x/net v0.60.0 html, fix 0.62.0). govulncheck
-#     on cmd/caddy finds x/net/html linked but never called.
+#   * GO-2026-6866 (x/net v0.60.0 html, fix 0.62.0) is MEDIUM. Its sibling
+#     GO-2026-6860 is HIGH and has an entry below.
 #   * GO-2026-6865 (klauspost/compress v1.20.1, fix 1.20.2): the zstd decoder
 #     panics on a crafted frame. Caddy only encodes responses with zstd and
 #     never decodes untrusted zstd input.
@@ -37,3 +37,15 @@
 # Followup: drop this entry once a caddy release no longer pulls in go-jose v3.
 
 CVE-2026-116587       # HIGH go-jose v3.0.5 (no fix) — RSA JWK parse DoS; caddy has no acme_server or pki configured, never parses untrusted JWKs.
+
+# Caddy v2.11.9 pins x/net v0.60.0. GO-2026-6860 (GHSA-75pg-wvh3-34jr, raised
+# to HIGH on 2026-11-04) is quadratic time in the x/net/html parser when it
+# coalesces many short text runs. Caddy core never imports x/net/html; it is
+# linked only through smallstep/cli-utils/usage (CLI help rendering), and
+# govulncheck on caddy v2.11.9 `cmd/caddy` reports no call path to Parse or
+# ParseFragment. Our Caddyfiles only proxy and serve
+# static files, so no request or response body is parsed as HTML.
+#
+# Followup: drop this entry once a caddy release ships x/net >= 0.62.0.
+
+CVE-2026-78661        # HIGH x/net v0.60.0 html (fix 0.62.0) — parser quadratic text coalescing DoS; govulncheck finds no call path from cmd/caddy, caddy never parses HTML.
