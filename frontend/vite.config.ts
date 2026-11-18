@@ -9,6 +9,7 @@ const KB = 1024;
 const BUNDLE_LIMITS_GZIP: Array<{ pattern: RegExp; limit: number; label: string }> = [
   { pattern: /^index-.*\.js$/, limit: 300 * KB, label: "index entry" },
   { pattern: /policy/i, limit: 200 * KB, label: "PolicyEditor chunk" },
+  { pattern: /^TrafficChart-.*\.js$/, limit: 150 * KB, label: "TrafficChart chunk" },
   { pattern: /\.js$/, limit: 100 * KB, label: "js chunk" },
   { pattern: /\.css$/, limit: 100 * KB, label: "css chunk" },
 ];
