@@ -164,13 +164,13 @@ func run(logger *slog.Logger) error {
 	srv.SetHistory(historyBuf)
 	srv.SetAuditLogger(auditLogger)
 
-	if cfg.ControlPlaneHTTP != "" {
-		proxy, err := api.NewControlPlaneProxy(cfg.ControlPlaneHTTP, cfg.ControlPlaneToken, cfg.ControlPlaneCACert, cfg.ControlPlaneInsecure)
+	if proxyURL := cfg.ControlPlaneProxyURL(); proxyURL != "" {
+		proxy, err := api.NewControlPlaneProxy(proxyURL, cfg.ControlPlaneToken, cfg.ControlPlaneCACert, cfg.ControlPlaneInsecure)
 		if err != nil {
 			logger.Warn("control-plane HTTP proxy disabled", "error", err)
 		} else {
 			srv.SetControlPlaneProxy(proxy)
-			logger.Info("control-plane HTTP proxy enabled", "endpoint", cfg.ControlPlaneHTTP)
+			logger.Info("control-plane HTTP proxy enabled", "endpoint", proxyURL)
 		}
 	}
 

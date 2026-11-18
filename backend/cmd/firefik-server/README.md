@@ -73,7 +73,10 @@ HTTP `/v1/enroll` endpoint.
 Agents (firefik-back) opt in by setting:
 
 - `FIREFIK_CONTROL_PLANE_GRPC=cp.example:8444` (machine API + RenewCert)
-- `FIREFIK_CONTROL_PLANE_HTTP=https://cp.example:8443` (bootstrap-only — `/v1/enroll`)
+- `FIREFIK_CONTROL_PLANE_HTTP=https://cp.example:8443` (optional; base URL of the
+  HTTP API for the agent's templates / approvals / agents / enrollment-tokens proxy)
+- `FIREFIK_CONTROL_PLANE_ADMIN_HTTP=https://cp-admin.example` (optional; overrides
+  `FIREFIK_CONTROL_PLANE_HTTP` for that proxy, see below)
 - `FIREFIK_CONTROL_PLANE_CA_CERT=/etc/firefik/ca-bundle.pem`
 - `FIREFIK_CONTROL_PLANE_CLIENT_CERT=/etc/firefik/client.crt`
 - `FIREFIK_CONTROL_PLANE_CLIENT_KEY=/etc/firefik/client.key`
@@ -84,6 +87,24 @@ Agents (firefik-back) opt in by setting:
 
 On connection loss the agent degrades to local-only operation — the
 control plane is an observer, not a master.
+
+### Separate admin and agent domains
+
+firefik-server serves every HTTP route on one listener (`--listen`), so the
+split is done in the reverse proxy in front of it. Agents need only:
+
+- gRPC `--grpc-listen` (`:8444`) — machine API and `RenewCert`;
+- HTTP `POST /v1/enroll` — first certificate (`firefik-admin enroll
+  --control-plane …` or the curl one-liner from the panel's *Add agent* page).
+
+Everything else under `/v1/*` (templates, approvals, agents, enrollment
+tokens, fleet, policies, login) is the operator API. Publish it on the admin
+domain and expose only `/v1/enroll` and `/healthz` on the agent domain. Add
+both names to `--server-name` when the auto-issued CP cert is used.
+
+Agents that use the templates / approvals UI proxy then point it at the admin
+domain with `FIREFIK_CONTROL_PLANE_ADMIN_HTTP`; without it the proxy uses
+`FIREFIK_CONTROL_PLANE_HTTP`.
 
 ## Features
 

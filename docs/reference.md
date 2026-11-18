@@ -156,6 +156,7 @@ Columns:
 | `FIREFIK_CONTROL_PLANE_HEARTBEAT_INTERVAL` | `30` | int (sec) | agent | | gRPC keep-alive. |
 | `FIREFIK_CONTROL_PLANE_INSTANCE_ID` | `(hostname)` | string | agent | | Advertised agent-id. |
 | `FIREFIK_CONTROL_PLANE_HTTP` | — | string | agent | | `https://host:port` of firefik-server's HTTP API. Empty = templates / approvals UI proxy disabled. |
+| `FIREFIK_CONTROL_PLANE_ADMIN_HTTP` | `(FIREFIK_CONTROL_PLANE_HTTP)` | string | agent | | Base URL for the templates / approvals / agents / enrollment-tokens proxy when firefik-server's admin `/v1/*` API is published on a separate domain from the agent-facing endpoints. Empty = use `FIREFIK_CONTROL_PLANE_HTTP`. |
 | `FIREFIK_CONTROL_PLANE_CERT_RENEW_BEFORE` | `259200` | int (sec) | agent | | Start self-renewal when the client cert has less than this left (72h). Must be ≤ server `FIREFIK_CP_CERT_RENEW_WINDOW`. |
 | `FIREFIK_CONTROL_PLANE_CERT_RENEW_INTERVAL` | `1800` | int (sec) | agent | | Renewal check period. |
 | `FIREFIK_CONTROL_PLANE_CERT_RENEW_TTL` | `2592000` | int (sec) | agent | | Requested TTL of the renewed cert (720h). |

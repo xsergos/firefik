@@ -64,6 +64,25 @@ func TestValidateChainSuffix(t *testing.T) {
 	}
 }
 
+func TestControlPlaneProxyURL(t *testing.T) {
+	cases := []struct {
+		name, http, admin, want string
+	}{
+		{"unset", "", "", ""},
+		{"falls back to agent http", "https://fw.example:8443", "", "https://fw.example:8443"},
+		{"admin overrides", "https://fw.example:8443", "https://fw-adm.example", "https://fw-adm.example"},
+		{"admin only", "", "https://fw-adm.example", "https://fw-adm.example"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Config{ControlPlaneHTTP: tc.http, ControlPlaneAdminHTTP: tc.admin}
+			if got := c.ControlPlaneProxyURL(); got != tc.want {
+				t.Fatalf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestFinaliseForRuntime(t *testing.T) {
 	c := &Config{ChainName: "FIREFIK", ChainSuffix: "v2"}
 	if err := c.FinaliseForRuntime(); err != nil {

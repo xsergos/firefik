@@ -121,7 +121,10 @@ services:
           />
         </Field>
 
-        <Field label="CP HTTP endpoint" hint="Where the host will exchange the token for a cert">
+        <Field
+          label="CP HTTP endpoint"
+          hint="Agent-facing URL serving /v1/enroll (may differ from this panel's domain)"
+        >
           <input
             value={cpHTTP}
             onChange={(e) => setCpHTTP(e.target.value.trim())}

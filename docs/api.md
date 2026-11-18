@@ -93,10 +93,12 @@ live list. The current set is:
   `?limit=<N>` (last N events) and `?since=<RFC3339>` (events strictly
   after the given timestamp).
 
-### Control-plane proxy (v0.12+, when `FIREFIK_CONTROL_PLANE_HTTP` set)
+### Control-plane proxy (v0.12+, when `FIREFIK_CONTROL_PLANE_HTTP` or `FIREFIK_CONTROL_PLANE_ADMIN_HTTP` set)
 
 These routes proxy to firefik-server's `/v1/templates` and
-`/v1/approvals` HTTP endpoints. The agent-side firefik-back forwards
+`/v1/approvals` HTTP endpoints. The upstream base URL is
+`FIREFIK_CONTROL_PLANE_ADMIN_HTTP` when set (admin API on its own domain),
+otherwise `FIREFIK_CONTROL_PLANE_HTTP`. The agent-side firefik-back forwards
 its own control-plane bearer (`FIREFIK_CONTROL_PLANE_TOKEN`), so the
 control-plane sees a single fingerprint per agent. Multiple operators
 behind one agent share that fingerprint — the 4-eyes guard catches

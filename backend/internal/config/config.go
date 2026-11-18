@@ -83,6 +83,7 @@ type Config struct {
 
 	ControlPlaneGRPC       string
 	ControlPlaneHTTP       string
+	ControlPlaneAdminHTTP  string
 	ControlPlaneToken      string
 	ControlPlaneInsecure   bool
 	ControlPlaneCACert     string
@@ -171,6 +172,7 @@ func Load() *Config {
 
 		ControlPlaneGRPC:       getEnv("FIREFIK_CONTROL_PLANE_GRPC", ""),
 		ControlPlaneHTTP:       getEnv("FIREFIK_CONTROL_PLANE_HTTP", ""),
+		ControlPlaneAdminHTTP:  getEnv("FIREFIK_CONTROL_PLANE_ADMIN_HTTP", ""),
 		ControlPlaneToken:      getEnvWithFile("FIREFIK_CONTROL_PLANE_TOKEN", "FIREFIK_CONTROL_PLANE_TOKEN_FILE", ""),
 		ControlPlaneInsecure:   getEnvBool("FIREFIK_CONTROL_PLANE_INSECURE", false),
 		ControlPlaneCACert:     SafePath(getEnv("FIREFIK_CONTROL_PLANE_CA_CERT", "")),
@@ -210,6 +212,13 @@ func (c *Config) EffectiveChainName() string {
 		return c.ChainName
 	}
 	return c.ChainName + "-" + c.ChainSuffix
+}
+
+func (c *Config) ControlPlaneProxyURL() string {
+	if c.ControlPlaneAdminHTTP != "" {
+		return c.ControlPlaneAdminHTTP
+	}
+	return c.ControlPlaneHTTP
 }
 
 func (c *Config) FinaliseForRuntime() error {
