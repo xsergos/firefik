@@ -49,7 +49,7 @@ test.describe("Containers keyboard shortcuts", () => {
     expect(["toast", "loader", "none"]).toContain(surfaced);
   });
 
-  test("'d' on an active row opens deactivate confirm dialog", async ({ page }) => {
+  test("'d' on an active row opens the turn-off confirm dialog", async ({ page }) => {
     await page.goto("/containers");
 
     const activeRow = page
@@ -58,7 +58,7 @@ test.describe("Containers keyboard shortcuts", () => {
       .first();
 
     if (!(await activeRow.isVisible().catch(() => false))) {
-      test.skip(true, "no active firewall rows to exercise deactivate shortcut");
+      test.skip(true, "no active firewall rows to exercise the turn-off shortcut");
       return;
     }
 
@@ -76,7 +76,7 @@ test.describe("Containers keyboard shortcuts", () => {
       return;
     }
 
-    await expect(dialog.getByText(/deactivate firewall/i)).toBeVisible();
+    await expect(dialog.getByText(/turn off the firewall/i)).toBeVisible();
 
     const cancel = dialog.getByRole("button", { name: /cancel/i });
     await cancel.click();

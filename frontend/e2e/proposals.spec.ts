@@ -9,7 +9,7 @@ test.describe("Autogen proposals page", () => {
 
     await page.goto("/proposals");
 
-    const heading = page.getByRole("heading", { name: /autogen proposals/i });
+    const heading = page.getByRole("heading", { name: /^proposals$/i });
     const errorAlert = page.getByRole("alert");
     const state = await Promise.race([
       heading.waitFor({ state: "visible", timeout: 10_000 }).then(() => "ok"),
@@ -24,7 +24,7 @@ test.describe("Autogen proposals page", () => {
       return;
     }
 
-    const emptyCopy = page.getByText(/no proposals in this bucket/i);
+    const emptyCopy = page.getByText(/no proposals with this status/i);
     const proposalItems = page.locator("ul.divide-y > li");
 
     const settled = await Promise.race([

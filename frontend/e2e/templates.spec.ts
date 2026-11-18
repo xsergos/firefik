@@ -28,11 +28,11 @@ test.describe("Templates page", () => {
 
     await page.goto("/templates");
 
-    await expect(page.getByRole("heading", { name: /policy templates/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^templates$/i })).toBeVisible();
     await expect(page.getByText("web-allow")).toBeVisible();
     await expect(page.getByText("alice")).toBeVisible();
     await expect(page.getByPlaceholder("template-name")).toBeVisible();
-    await expect(page.getByPlaceholder(/policy DSL body/i)).toBeVisible();
+    await expect(page.locator(".cm-content").first()).toBeVisible();
 
     const publishBtn = page.getByRole("button", { name: /^Publish$/ });
     await expect(publishBtn).toBeVisible();

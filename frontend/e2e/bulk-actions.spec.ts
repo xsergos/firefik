@@ -19,11 +19,14 @@ test.describe("Containers bulk actions", () => {
       return;
     }
 
-    const rowCheckboxes = page.locator('tr[data-ctr-id] input[type="checkbox"]');
+    const rowCheckboxes = page
+      .locator("tr[data-ctr-id]")
+      .filter({ has: page.getByText(/^active$/i) })
+      .locator('input[type="checkbox"]');
     const count = await rowCheckboxes.count();
 
     if (count < 2) {
-      test.skip(true, `need at least 2 selectable containers, found ${count}`);
+      test.skip(true, `need at least 2 containers with an active firewall, found ${count}`);
       return;
     }
 
@@ -31,7 +34,7 @@ test.describe("Containers bulk actions", () => {
     await rowCheckboxes.nth(1).check();
 
     const applySelected = page.getByRole("button", { name: /apply selected/i });
-    const disableSelected = page.getByRole("button", { name: /disable selected/i });
+    const disableSelected = page.getByRole("button", { name: /turn off selected/i });
 
     await expect(applySelected).toBeVisible();
     await expect(applySelected).toBeEnabled();

@@ -32,7 +32,7 @@ test.describe("API failure recovery", () => {
     await page.unroute("**/api/rules*");
     await page.reload();
 
-    const heading = page.getByRole("heading", { name: /active rules/i });
+    const heading = page.getByRole("heading", { name: /^rules$/i });
     const emptyState = page.getByText(/no active firewall rules/i);
     const errorAfterReload = page.getByRole("alert");
     const recovered = await Promise.race([

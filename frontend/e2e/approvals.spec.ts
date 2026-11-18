@@ -46,7 +46,7 @@ test.describe("Approvals page", () => {
 
     await page.goto("/approvals");
 
-    await expect(page.getByRole("heading", { name: /policy approvals/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^approvals$/i })).toBeVisible();
     await expect(page.getByText("web-allow")).toBeVisible();
     await expect(page.getByRole("button", { name: "pending" })).toBeVisible();
     await expect(page.getByRole("button", { name: "approved" })).toBeVisible();

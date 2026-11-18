@@ -18,7 +18,7 @@ test.describe("Firefik UI smoke", () => {
     await page.goto("/rules");
     const visible = await Promise.race([
       page
-        .getByRole("heading", { name: /active rules/i })
+        .getByRole("heading", { name: /^rules$/i })
         .waitFor({ state: "visible" })
         .then(() => true),
       page
@@ -31,7 +31,7 @@ test.describe("Firefik UI smoke", () => {
 
   test("logs page opens and WS connects", async ({ page }) => {
     await page.goto("/logs");
-    await expect(page.getByRole("heading", { name: /live logs/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /traffic log/i })).toBeVisible();
     await expect(page.getByRole("status")).toBeVisible();
   });
 
@@ -60,19 +60,19 @@ test.describe("Firefik UI smoke", () => {
       return;
     }
 
-    const applyButton = row.getByRole("button", { name: /apply firewall/i });
+    const applyButton = row.getByRole("button", { name: /^apply rules for/i });
     if (await applyButton.isVisible()) {
       await applyButton.click();
-      await expect(row.getByText(/active/i)).toBeVisible({ timeout: 10_000 });
+      await expect(row.getByText(/^active$/i)).toBeVisible({ timeout: 10_000 });
     }
 
-    const deactivateButton = row.getByRole("button", { name: /deactivate firewall/i });
+    const deactivateButton = row.getByRole("button", { name: /turn off firewall for/i });
     await deactivateButton.click();
 
     const dialog = page.getByRole("dialog");
-    await expect(dialog.getByText(/deactivate firewall/i)).toBeVisible();
-    await dialog.getByRole("button", { name: /^deactivate$/i }).click();
+    await expect(dialog.getByText(/turn off the firewall/i)).toBeVisible();
+    await dialog.getByRole("button", { name: /^turn off$/i }).click();
 
-    await expect(row.getByText(/inactive|disabled/i)).toBeVisible({ timeout: 10_000 });
+    await expect(row.getByText(/^(off|pending)$/i)).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -30,7 +30,7 @@ test.describe("Policies page", () => {
       return;
     }
 
-    const policyButtons = page.locator("aside button").filter({ hasNotText: /new policy/i });
+    const policyButtons = page.locator("main aside button").filter({ hasNotText: /new policy/i });
     const policyCount = await policyButtons.count();
 
     if (policyCount === 0) {
