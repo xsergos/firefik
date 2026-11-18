@@ -1,32 +1,134 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import { Link } from "react-router-dom";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { AgentStatusBadge } from "@/components/shared/AgentStatusBadge";
 import { toast } from "sonner";
-import { createEnrollmentToken, type EnrollmentToken } from "@/lib/fleetApi";
+import { createEnrollmentToken, fetchPanelConfig, type EnrollmentToken } from "@/lib/fleetApi";
 import { isValidInstanceID, isValidHTTPURL, isValidGRPCEndpoint } from "@/lib/enrollValidators";
 
 const DEFAULT_CP_HTTP = "https://cp.example.com:8443";
 const DEFAULT_CP_GRPC = "cp.example.com:8444";
 const DEFAULT_TTL_MINUTES = 15;
+const MIN_TTL_MINUTES = 1;
+const MAX_TTL_MINUTES = 1440;
+const CLOCK_TICK_MS = 15_000;
+const STORAGE_KEY = "firefik.addAgent.endpoints";
+const INPUT_CLASS =
+  "border border-input bg-background text-foreground placeholder:text-muted-foreground px-2 py-1 rounded text-sm w-full font-mono";
+const LOCALHOST_WARNING =
+  "A remote host cannot reach localhost. Use an address the new host can reach.";
+
+let clockNow = Date.now();
+let clockTimer: ReturnType<typeof setInterval> | null = null;
+const clockListeners = new Set<() => void>();
+
+function subscribeClock(listener: () => void): () => void {
+  clockListeners.add(listener);
+  if (clockTimer === null) {
+    clockNow = Date.now();
+    clockTimer = setInterval(() => {
+      clockNow = Date.now();
+      for (const l of clockListeners) l();
+    }, CLOCK_TICK_MS);
+  }
+  return () => {
+    clockListeners.delete(listener);
+    if (clockListeners.size === 0 && clockTimer !== null) {
+      clearInterval(clockTimer);
+      clockTimer = null;
+    }
+  };
+}
+
+function getClockNow(): number {
+  return clockNow;
+}
+
+function useTickingNow(): number {
+  return useSyncExternalStore(subscribeClock, getClockNow, getClockNow);
+}
+
+function readStoredEndpoints(): { http?: string; grpc?: string } {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as { http?: string; grpc?: string }) : {};
+  } catch {
+    return {};
+  }
+}
+
+function storeEndpoints(http: string, grpc: string) {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ http, grpc }));
+  } catch {
+    return;
+  }
+}
+
+function parseTTL(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const n = Number(trimmed);
+  return n >= MIN_TTL_MINUTES && n <= MAX_TTL_MINUTES ? n : null;
+}
+
+function isLocalHost(host: string): boolean {
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  return (
+    h === "localhost" ||
+    h.endsWith(".localhost") ||
+    h === "::1" ||
+    h === "0.0.0.0" ||
+    /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)
+  );
+}
+
+function httpHost(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
+function grpcHost(endpoint: string): string {
+  const colon = endpoint.lastIndexOf(":");
+  return colon > 0 ? endpoint.slice(0, colon) : endpoint;
+}
 
 export default function AddAgentPage() {
   const [instanceID, setInstanceID] = useState("host-01");
-  const [cpHTTP, setCpHTTP] = useState(DEFAULT_CP_HTTP);
-  const [cpGRPC, setCpGRPC] = useState(DEFAULT_CP_GRPC);
-  const [ttlMinutes, setTtlMinutes] = useState(DEFAULT_TTL_MINUTES);
-  const [issued, setIssued] = useState<EnrollmentToken | null>(null);
+  const [stored] = useState(readStoredEndpoints);
+  const [httpOverride, setCpHTTP] = useState<string | null>(null);
+  const [grpcOverride, setCpGRPC] = useState<string | null>(null);
+  const panelConfig = useQuery({
+    queryKey: ["panel-config"],
+    queryFn: fetchPanelConfig,
+    retry: false,
+    staleTime: Infinity,
+  });
+  const cpHTTP = httpOverride ?? (panelConfig.data?.enroll_url || stored.http || DEFAULT_CP_HTTP);
+  const cpGRPC =
+    grpcOverride ?? (panelConfig.data?.grpc_endpoint || stored.grpc || DEFAULT_CP_GRPC);
+  const [ttlRaw, setTtlRaw] = useState(String(DEFAULT_TTL_MINUTES));
+  const [ttlTouched, setTtlTouched] = useState(false);
+  const [issued, setIssued] = useState<IssuedToken | null>(null);
+  const now = useTickingNow();
 
+  const ttlMinutes = parseTTL(ttlRaw);
   const validInstance = isValidInstanceID(instanceID);
   const validHTTP = isValidHTTPURL(cpHTTP);
   const validGRPC = isValidGRPCEndpoint(cpGRPC);
-  const valid = validInstance && validHTTP && validGRPC;
+  const valid = validInstance && validHTTP && validGRPC && ttlMinutes !== null;
+  const httpIsLocal = validHTTP && isLocalHost(httpHost(cpHTTP));
+  const grpcIsLocal = validGRPC && isLocalHost(grpcHost(cpGRPC));
 
   const create = useMutation({
-    mutationFn: () => createEnrollmentToken(instanceID, ttlMinutes * 60),
+    mutationFn: () => createEnrollmentToken(instanceID, (ttlMinutes ?? DEFAULT_TTL_MINUTES) * 60),
     onSuccess: (tok) => {
-      setIssued(tok);
+      setIssued({ ...tok, receivedAt: Date.now() });
+      storeEndpoints(cpHTTP, cpGRPC);
       toast.success("Enrollment token created");
     },
     onError: (e: Error) => toast.error(`Token creation failed: ${e.message}`),
@@ -75,7 +177,7 @@ services:
       .catch(() => toast.error("clipboard write failed"));
   };
 
-  const expiresIn = formatExpiresIn(issued);
+  const expiresIn = formatExpiresIn(issued, now);
 
   return (
     <div className="space-y-4 max-w-3xl">
@@ -86,66 +188,113 @@ services:
         <h1 className="text-2xl font-bold">Add agent</h1>
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Create a one-time enrollment token, then paste the bash snippet on the new host. The agent
-        will exchange the token for a short-lived mTLS client cert via the embedded mini-CA, then
-        connect to the control plane via gRPC and self-register. Token is single-use and expires in
-        the chosen TTL.
-      </p>
+      <div className="space-y-2 text-sm text-muted-foreground">
+        <p>
+          Create a one-time code, run two snippets on the new host, and it joins the fleet. The code
+          works once and expires after the time you choose.
+        </p>
+        <p>
+          Before you start, the new host needs a root shell, <code>curl</code>, <code>jq</code>, and
+          Docker with Compose.
+        </p>
+        <p>
+          Cannot use one-time enrollment on this host? Issue a long-lived token on{" "}
+          <Link to="/agent-tokens" className="underline">
+            Agent tokens
+          </Link>{" "}
+          instead.
+        </p>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Field label="Instance ID" hint="DNS-label format, e.g. host-prod-01">
+        <Field id="add-agent-instance" label="Instance ID" hint="Lowercase name, e.g. host-prod-01">
           <input
+            id="add-agent-instance"
+            aria-describedby="add-agent-instance-hint"
             value={instanceID}
             onChange={(e) => {
               setInstanceID(e.target.value.trim());
               setIssued(null);
             }}
-            className="border border-input bg-background text-foreground placeholder:text-muted-foreground px-2 py-1 rounded text-sm w-full font-mono"
+            className={INPUT_CLASS}
           />
           {!validInstance && (
             <span className="text-xs text-destructive">Must match [a-z0-9-]{`{3,63}`}</span>
           )}
         </Field>
 
-        <Field label="Token TTL (minutes)" hint="Single-use; 1–1440">
+        <Field
+          id="add-agent-ttl"
+          label="Code expires after (minutes)"
+          hint={`Single-use; ${MIN_TTL_MINUTES}–${MAX_TTL_MINUTES}`}
+        >
           <input
+            id="add-agent-ttl"
+            aria-describedby="add-agent-ttl-hint"
             type="number"
-            min={1}
-            max={1440}
-            value={ttlMinutes}
-            onChange={(e) =>
-              setTtlMinutes(Math.max(1, parseInt(e.target.value, 10) || DEFAULT_TTL_MINUTES))
-            }
-            className="border border-input bg-background text-foreground placeholder:text-muted-foreground px-2 py-1 rounded text-sm w-full font-mono"
+            inputMode="numeric"
+            min={MIN_TTL_MINUTES}
+            max={MAX_TTL_MINUTES}
+            value={ttlRaw}
+            aria-invalid={ttlTouched && ttlMinutes === null}
+            onChange={(e) => setTtlRaw(e.target.value)}
+            onBlur={() => {
+              setTtlTouched(true);
+              if (ttlMinutes !== null) setTtlRaw(String(ttlMinutes));
+            }}
+            className={INPUT_CLASS}
           />
+          {ttlTouched && ttlMinutes === null && (
+            <span className="text-xs text-destructive">
+              Enter a whole number of minutes from {MIN_TTL_MINUTES} to {MAX_TTL_MINUTES}.
+            </span>
+          )}
         </Field>
 
         <Field
-          label="CP HTTP endpoint"
-          hint="Agent-facing URL serving /v1/enroll (may differ from this panel's domain)"
+          id="add-agent-http"
+          label="Enrollment address"
+          hint="Address the new host uses to fetch its certificate (may differ from this panel's address)"
         >
           <input
+            id="add-agent-http"
+            aria-describedby="add-agent-http-hint"
             value={cpHTTP}
             onChange={(e) => setCpHTTP(e.target.value.trim())}
-            className="border border-input bg-background text-foreground placeholder:text-muted-foreground px-2 py-1 rounded text-sm w-full font-mono"
+            className={INPUT_CLASS}
           />
           {!validHTTP && (
             <span className="text-xs text-destructive">
               Must be https://host[:port][/path] (no shell-special chars)
             </span>
           )}
+          {httpIsLocal && (
+            <span className="block text-xs text-amber-700 dark:text-amber-400">
+              {LOCALHOST_WARNING}
+            </span>
+          )}
         </Field>
 
-        <Field label="CP gRPC endpoint" hint="For agent ↔ control-plane streaming">
+        <Field
+          id="add-agent-grpc"
+          label="Agent connection address"
+          hint="host:port the agent keeps connected to"
+        >
           <input
+            id="add-agent-grpc"
+            aria-describedby="add-agent-grpc-hint"
             value={cpGRPC}
             onChange={(e) => setCpGRPC(e.target.value.trim())}
-            className="border border-input bg-background text-foreground placeholder:text-muted-foreground px-2 py-1 rounded text-sm w-full font-mono"
+            className={INPUT_CLASS}
           />
           {!validGRPC && (
             <span className="text-xs text-destructive">
               Must be host:port (DNS / IP, port 1–65535)
+            </span>
+          )}
+          {grpcIsLocal && (
+            <span className="block text-xs text-amber-700 dark:text-amber-400">
+              {LOCALHOST_WARNING}
             </span>
           )}
         </Field>
@@ -156,12 +305,12 @@ services:
           {create.isPending ? "Generating…" : issued ? "Generate new token" : "Generate token"}
         </Button>
         {issued && (
-          <span className="text-sm text-muted-foreground">
+          <span className="text-sm text-muted-foreground" aria-live="polite">
             token:{" "}
             <code className="text-xs bg-muted px-1 py-0.5 rounded">
               {issued.token.slice(0, 12)}…
             </code>{" "}
-            • expires in {expiresIn}
+            • {expiresIn === "expired" ? "expired" : `expires in ${expiresIn}`}
           </span>
         )}
       </div>
@@ -201,28 +350,20 @@ services:
           <Section title="What happens next">
             <ul className="text-sm space-y-1 list-disc pl-5">
               <li>
-                Step 1 consumes the token (single-use) and writes mTLS cert + key + CA bundle to{" "}
+                Step 1 uses up the code and saves the host&apos;s certificate and key in{" "}
                 <code>/etc/firefik/</code>.
               </li>
-              <li>Step 2 starts the agent which dials CP gRPC and self-registers.</li>
+              <li>Step 2 starts the agent, which connects to the control plane by itself.</li>
               <li>
-                The new host appears in{" "}
+                The new host appears on the{" "}
                 <Link to="/fleet" className="underline">
-                  /fleet
+                  Fleet
                 </Link>{" "}
-                within ~30s. Status:{" "}
-                <Badge variant="default" className="text-xs">
-                  healthy
-                </Badge>{" "}
-                <Badge variant="secondary" className="text-xs">
-                  stale
-                </Badge>{" "}
-                <Badge variant="destructive" className="text-xs">
-                  dead
-                </Badge>
-                .
+                page within about 30 seconds, with one of these statuses:{" "}
+                <AgentStatusBadge status="healthy" /> <AgentStatusBadge status="stale" />{" "}
+                <AgentStatusBadge status="dead" />.
               </li>
-              <li>Token expires automatically; re-issue here if needed.</li>
+              <li>The code expires on its own; generate a new one here if needed.</li>
             </ul>
           </Section>
         </>
@@ -231,27 +372,40 @@ services:
   );
 }
 
-function formatExpiresIn(issued: EnrollmentToken | null): string {
+type IssuedToken = EnrollmentToken & { receivedAt: number };
+
+function formatExpiresIn(issued: IssuedToken | null, now: number): string {
   if (!issued) return "";
-  const ms = new Date(issued.expires_at).getTime() - Date.now();
+  const expires = new Date(issued.expires_at).getTime();
+  const serverLifetime = expires - new Date(issued.issued_at).getTime();
+  const lifetime = Number.isFinite(serverLifetime) ? serverLifetime : expires - issued.receivedAt;
+  const ms = lifetime - Math.max(0, now - issued.receivedAt);
   if (ms <= 0) return "expired";
-  return `${Math.max(1, Math.round(ms / 60_000))} min`;
+  return `${Math.max(1, Math.ceil(ms / 60_000))} min`;
 }
 
 function Field({
+  id,
   label,
   hint,
   children,
 }: {
+  id: string;
   label: string;
   hint?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className="space-y-1">
-      <label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</label>
+      <label htmlFor={id} className="text-xs uppercase tracking-wide text-muted-foreground">
+        {label}
+      </label>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      {hint && (
+        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

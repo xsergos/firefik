@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"net"
-	"regexp"
 	"strings"
 
 	"github.com/coreos/go-iptables/iptables"
@@ -22,13 +21,12 @@ const (
 	iptablesMaxChainLen = 28
 )
 
-var safePrefixRe = regexp.MustCompile(`[^A-Za-z0-9 _\-]`)
-
 type IPTablesBackend struct {
-	ipt         *iptables.IPTables
-	chainName   string
-	parentChain string
-	stateful    bool
+	ipt            *iptables.IPTables
+	chainName      string
+	parentChain    string
+	stateful       bool
+	defaultDropLog int
 }
 
 var _ Backend = (*IPTablesBackend)(nil)
@@ -47,6 +45,18 @@ func NewIPTablesBackend(chainName, parentChain string) (*IPTablesBackend, error)
 }
 
 func (b *IPTablesBackend) SetStateful(v bool) { b.stateful = v }
+
+func (b *IPTablesBackend) SetDefaultDropLogRate(perSecond int) { b.defaultDropLog = perSecond }
+
+func defaultDropNflogArgs(perSecond int, label string) []string {
+	rate := fmt.Sprintf("%d/second", perSecond)
+	burst := fmt.Sprintf("%d", perSecond)
+	return []string{
+		"-m", "limit", "--limit", rate, "--limit-burst", burst,
+		"-j", "NFLOG", "--nflog-group", fmt.Sprintf("%d", NflogGroup),
+		"--nflog-prefix", NflogPrefix("DROP", label),
+	}
+}
 
 func (b *IPTablesBackend) SetupChains() error {
 	_ = b.ipt.NewChain(filterTable, b.chainName)
@@ -152,6 +162,12 @@ func (b *IPTablesBackend) ApplyContainerRules(
 		}
 	}
 
+	if b.defaultDropLog > 0 && strings.EqualFold(defaultPolicy, "DROP") {
+		if err := b.ipt.AppendUnique(filterTable, mainChain, defaultDropNflogArgs(b.defaultDropLog, DefaultPolicyLogLabel)...); err != nil {
+			return fmt.Errorf("append default policy log: %w", err)
+		}
+	}
+
 	if err := b.ipt.AppendUnique(filterTable, mainChain, "-j", defaultPolicy); err != nil {
 		return fmt.Errorf("append default policy %s: %w", defaultPolicy, err)
 	}
@@ -183,7 +199,7 @@ func (b *IPTablesBackend) fillRuleSetChain(chain string, rs docker.FirewallRuleS
 			src := bl.String()
 
 			if rs.Log {
-				logRule := buildNflogRule(proto, portStr, src, rs.LogPrefix, "DROP")
+				logRule := buildNflogRule(proto, portStr, src, ruleLogLabel(rs.LogPrefix, rs.Name), "DROP")
 				_ = b.ipt.AppendUnique(filterTable, chain, logRule...)
 			}
 			dropRule := buildRule(proto, portStr, src, "DROP")
@@ -206,7 +222,7 @@ func (b *IPTablesBackend) fillRuleSetChain(chain string, rs docker.FirewallRuleS
 				}
 			} else {
 				if rs.Log {
-					logRule := buildNflogRule(proto, portStr, src, rs.LogPrefix, "ACCEPT")
+					logRule := buildNflogRule(proto, portStr, src, ruleLogLabel(rs.LogPrefix, rs.Name), "ACCEPT")
 					_ = b.ipt.AppendUnique(filterTable, chain, logRule...)
 				}
 				acceptRule := buildRule(proto, portStr, src, "ACCEPT")
@@ -218,7 +234,10 @@ func (b *IPTablesBackend) fillRuleSetChain(chain string, rs docker.FirewallRuleS
 
 		if len(allowlist) > 0 {
 			if rs.Log {
-				logRule := buildNflogRule(proto, portStr, "", rs.LogPrefix, "DROP")
+				logRule := buildNflogRule(proto, portStr, "", ruleLogLabel(rs.LogPrefix, rs.Name), "DROP")
+				_ = b.ipt.AppendUnique(filterTable, chain, logRule...)
+			} else if b.defaultDropLog > 0 {
+				logRule := append([]string{"-p", proto, "--dport", portStr}, defaultDropNflogArgs(b.defaultDropLog, ruleLogLabel(rs.LogPrefix, rs.Name))...)
 				_ = b.ipt.AppendUnique(filterTable, chain, logRule...)
 			}
 			dropRule := []string{"-p", proto, "--dport", portStr, "-j", "DROP"}
@@ -346,15 +365,8 @@ func ruleJumpsTo(parts []string, target string) bool {
 	return false
 }
 
-func buildNflogRule(proto, port, src, logPrefix, actionType string) []string {
-	prefix := logPrefix
-	if prefix == "" {
-		prefix = "FIREFIK " + actionType
-	}
-	prefix = safePrefixRe.ReplaceAllString(prefix, "")
-	if len(prefix) > LogPrefixMaxLen {
-		prefix = prefix[:LogPrefixMaxLen]
-	}
+func buildNflogRule(proto, port, src, label, actionType string) []string {
+	prefix := NflogPrefix(actionType, label)
 
 	rule := []string{"-p", proto, "--dport", port}
 	if src != "" && src != "0.0.0.0/0" && src != "::/0" {

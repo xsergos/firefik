@@ -4,18 +4,34 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import PolicyEditor from "./PolicyEditor";
 
 vi.mock("@uiw/react-codemirror", () => ({
+  EditorView: {
+    contentAttributes: { of: (attrs: Record<string, string>) => ({ __attrs: attrs }) },
+  },
   default: ({
     value,
     onChange,
     className,
+    placeholder,
+    height,
+    extensions,
   }: {
     value: string;
     onChange: (v: string) => void;
     className?: string;
+    placeholder?: string;
+    height?: string;
+    extensions?: unknown[];
   }) => (
     <textarea
       data-testid="policy-editor-cm"
       className={className}
+      placeholder={placeholder}
+      data-height={height}
+      data-attrs={JSON.stringify(
+        (extensions ?? [])
+          .map((e) => (e as { __attrs?: Record<string, string> }).__attrs)
+          .find(Boolean) ?? null,
+      )}
       value={value}
       onChange={(e) => onChange(e.target.value)}
     />
@@ -59,5 +75,34 @@ describe("PolicyEditor", () => {
     render(<PolicyEditor value="" onChange={() => {}} className="my-custom" />);
     const ta = screen.getByTestId("policy-editor-cm");
     expect(ta.className).toBe("my-custom");
+  });
+
+  it("adds no content attributes and keeps the default height without a11y props", () => {
+    render(<PolicyEditor value="" onChange={() => {}} />);
+    const ta = screen.getByTestId("policy-editor-cm");
+    expect(ta.getAttribute("data-attrs")).toBe("null");
+    expect(ta.getAttribute("data-height")).toBe("260px");
+  });
+
+  it("passes id, label and description to the editable area and forwards placeholder and height", () => {
+    render(
+      <PolicyEditor
+        value=""
+        onChange={() => {}}
+        id="body"
+        ariaLabelledBy="body-label"
+        ariaDescribedBy="body-hint"
+        placeholder="type here"
+        height="200px"
+      />,
+    );
+    const ta = screen.getByTestId("policy-editor-cm");
+    expect(JSON.parse(ta.getAttribute("data-attrs") ?? "null")).toEqual({
+      id: "body",
+      "aria-labelledby": "body-label",
+      "aria-describedby": "body-hint",
+    });
+    expect(ta).toHaveAttribute("placeholder", "type here");
+    expect(ta.getAttribute("data-height")).toBe("200px");
   });
 });

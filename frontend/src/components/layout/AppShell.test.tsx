@@ -1,6 +1,6 @@
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppShell } from "@/components/layout/AppShell";
@@ -70,8 +70,47 @@ describe("AppShell", () => {
     expect(screen.getByRole("link", { name: "Rules" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Policies" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Proposals" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Logs" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "History" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Traffic log" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Change history" })).toBeInTheDocument();
+  });
+
+  it("groups the nav items under section headings", () => {
+    renderAt("/");
+    const nav = screen.getByRole("navigation", { name: "Main navigation" });
+    for (const heading of ["Overview", "Protect", "Watch", "Advanced"]) {
+      expect(within(nav).getByText(heading)).toBeInTheDocument();
+    }
+  });
+
+  it("renders the page inside a focusable main landmark", () => {
+    renderAt("/containers");
+    const main = screen.getByRole("main");
+    expect(main).toHaveAttribute("id", "main");
+    expect(within(main).getByTestId("outlet-containers")).toBeInTheDocument();
+  });
+
+  it("offers a skip link that moves focus to the main content", async () => {
+    renderAt("/");
+    const user = userEvent.setup();
+    await user.tab();
+    const skip = screen.getByRole("link", { name: "Skip to content" });
+    expect(skip).toHaveFocus();
+    await user.click(skip);
+    expect(screen.getByRole("main")).toHaveFocus();
+  });
+
+  it("opens the mobile menu and closes it after navigating", async () => {
+    renderAt("/");
+    const user = userEvent.setup();
+    const menuButton = screen.getByRole("button", { name: "Open menu" });
+    expect(menuButton).toHaveAttribute("aria-expanded", "false");
+    await user.click(menuButton);
+    const drawer = await screen.findByRole("dialog");
+    await user.click(within(drawer).getByRole("link", { name: "Rules" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("outlet-rules")).toBeInTheDocument();
   });
 
   it("renders the outlet content for the current route", () => {

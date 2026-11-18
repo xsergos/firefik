@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { logStreamMessageSchema, type LogEntry } from "@/types/api";
+import { controlPlaneLogLineSchema, logStreamMessageSchema, type LogEntry } from "@/types/api";
 import { wsLogsUrl } from "@/lib/api";
 
 const MAX_ENTRIES = 1000;
@@ -8,6 +8,24 @@ const BASE_RECONNECT_MS = 2000;
 const MAX_RECONNECT_MS = 30_000;
 
 export type KeyedLogEntry = LogEntry & { _id: number };
+
+export function unwrapControlPlaneLine(parsed: unknown): unknown {
+  const wrapped = controlPlaneLogLineSchema.safeParse(parsed);
+  if (!wrapped.success) return parsed;
+  const { agent, at, line } = wrapped.data;
+  let inner: unknown;
+  try {
+    inner = JSON.parse(line);
+  } catch {
+    return { ts: at, raw: line, agent: agent.instance_id };
+  }
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) {
+    const obj = inner as Record<string, unknown>;
+    if ("event" in obj) return obj;
+    return { ts: at, ...obj, agent: agent.instance_id };
+  }
+  return { ts: at, raw: line, agent: agent.instance_id };
+}
 
 function nextDelay(attempt: number): number {
   const base = Math.min(BASE_RECONNECT_MS * 2 ** attempt, MAX_RECONNECT_MS);
@@ -55,7 +73,7 @@ export function useLogStream(filter?: string) {
           console.warn("logstream: invalid JSON", e.data);
           return;
         }
-        const result = logStreamMessageSchema.safeParse(parsed);
+        const result = logStreamMessageSchema.safeParse(unwrapControlPlaneLine(parsed));
         if (!result.success) {
           console.warn("logstream: schema mismatch", result.error.issues);
           return;

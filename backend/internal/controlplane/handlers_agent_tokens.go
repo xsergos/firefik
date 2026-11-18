@@ -39,12 +39,10 @@ func (s *HTTPServer) createAgentToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if s.Audit != nil {
-		s.Audit.Emit("agent_token_created", map[string]string{
-			"id":   issued.ID,
-			"name": issued.Name,
-		})
-	}
+	s.recordChange(r, "agent_token_created", "", map[string]string{
+		"id":   issued.ID,
+		"name": issued.Name,
+	})
 	writeJSON(w, http.StatusCreated, issued)
 }
 
@@ -78,9 +76,11 @@ func (s *HTTPServer) handleAgentTokenItem(w http.ResponseWriter, r *http.Request
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if s.Audit != nil {
-			s.Audit.Emit("agent_token_revoked", map[string]string{"id": id})
+		fields := map[string]string{"id": id}
+		if tok, ok, _ := s.Registry.store.GetAgentToken(r.Context(), id); ok {
+			fields["name"] = tok.Name
 		}
+		s.recordChange(r, "agent_token_revoked", "", fields)
 		w.WriteHeader(http.StatusNoContent)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

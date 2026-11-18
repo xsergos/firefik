@@ -33,11 +33,16 @@ type AutogenProposalSource interface {
 	Proposals(ctx context.Context) []AutogenProposal
 }
 
+type AuditForwardSource interface {
+	Audits() <-chan map[string]any
+}
+
 type AgentLoop struct {
 	cfg            AgentLoopConfig
 	identity       AgentIdentity
 	source         AgentSource
 	logSource      LogForwardSource
+	auditSource    AuditForwardSource
 	proposalSource AutogenProposalSource
 	dispatcher     CommandDispatcher
 	logger         *slog.Logger
@@ -70,6 +75,11 @@ func (l *AgentLoop) WithLogSource(s LogForwardSource) *AgentLoop {
 	return l
 }
 
+func (l *AgentLoop) WithAuditSource(s AuditForwardSource) *AgentLoop {
+	l.auditSource = s
+	return l
+}
+
 func (l *AgentLoop) WithProposalSource(s AutogenProposalSource) *AgentLoop {
 	l.proposalSource = s
 	return l
@@ -99,8 +109,35 @@ func (l *AgentLoop) Run(ctx context.Context) error {
 	if l.logSource != nil {
 		go l.logForwarder(pushCtx, grpcClient)
 	}
+	if l.auditSource != nil {
+		go l.auditForwarder(pushCtx, grpcClient)
+	}
 
 	return grpcClient.Run(ctx)
+}
+
+type auditSender interface {
+	SendAudit(event map[string]any) error
+}
+
+func (l *AgentLoop) auditForwarder(ctx context.Context, sender auditSender) {
+	ch := l.auditSource.Audits()
+	if ch == nil {
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			if err := sender.SendAudit(ev); err != nil && l.logger != nil {
+				l.logger.Debug("audit forward failed", "error", err, "action", ev["action"])
+			}
+		}
+	}
 }
 
 func (l *AgentLoop) logForwarder(ctx context.Context, grpcClient *GRPCClient) {

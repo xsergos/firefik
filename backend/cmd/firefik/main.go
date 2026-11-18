@@ -98,7 +98,13 @@ func run(logger *slog.Logger) error {
 
 	auditLogger := audit.New(logger)
 	historyBuf := audit.NewHistoryBuffer(500)
-	if sink, err := buildAuditSink(cfg, logger, version, historyBuf); err != nil {
+	var auditBridge *cpAuditBridge
+	var extraSinks []audit.Sink
+	if cfg.ControlPlaneGRPC != "" {
+		auditBridge = newCPAuditBridge()
+		extraSinks = append(extraSinks, auditBridge)
+	}
+	if sink, err := buildAuditSink(cfg, logger, version, historyBuf, extraSinks...); err != nil {
 		logger.Warn("audit sink unavailable; falling back to slog-only", "error", err)
 	} else if sink != nil {
 		auditLogger = auditLogger.WithSink(sink)
@@ -142,6 +148,7 @@ func run(logger *slog.Logger) error {
 			if err != nil {
 				logger.Warn("ip6tables unavailable, IPv6 rules disabled", "error", err)
 			} else {
+				ip6t.SetDefaultDropLogRate(cfg.DefaultDropLogRate())
 				if err := ip6t.SetupChains(); err != nil {
 					logger.Warn("ip6tables chain setup failed", "error", err)
 				} else {
@@ -240,7 +247,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	g.Go(func() error {
-		if err := logstream.StartNflogReader(gctx, rules.NflogGroup, hub, logger, trafficStore.RecordAction, onFlow); err != nil {
+		if err := logstream.StartNflogReader(gctx, rules.NflogGroup, hub, logger, trafficStore.RecordAction, onFlow, engine.ContainerByIP); err != nil {
 			logger.Warn("nflog reader stopped", "error", err)
 		}
 		return nil
@@ -419,6 +426,9 @@ func run(logger *slog.Logger) error {
 		})
 		bridge := newCPLogBridge(hub)
 		loop := controlplane.NewAgentLoop(loopCfg, identity, source, dispatcher, logger).WithLogSource(bridge)
+		if auditBridge != nil {
+			loop = loop.WithAuditSource(auditBridge)
+		}
 		if observer != nil {
 			loop = loop.WithProposalSource(&agentdispatch.ProposalSource{Observer: observer, Config: cfg})
 		}
@@ -717,10 +727,18 @@ func cleanupOldSuffixes(cfg *config.Config, logger *slog.Logger, auditLog *audit
 	return nil
 }
 
-func buildAuditSink(cfg *config.Config, logger *slog.Logger, version string, history *audit.HistoryBuffer) (audit.Sink, error) {
+func buildAuditSink(cfg *config.Config, logger *slog.Logger, version string, history *audit.HistoryBuffer, extra ...audit.Sink) (audit.Sink, error) {
 	sinks, err := buildConfiguredSinks(cfg, logger, version, history)
 	if err != nil {
 		return nil, err
+	}
+	if history != nil && !containsSink(sinks, history) {
+		sinks = append(sinks, history)
+	}
+	for _, s := range extra {
+		if s != nil {
+			sinks = append(sinks, s)
+		}
 	}
 	if wh := buildWebhookSink(cfg, logger); wh != nil {
 		sinks = append(sinks, wh)
@@ -736,6 +754,15 @@ func buildAuditSink(cfg *config.Config, logger *slog.Logger, version string, his
 		return sinks[0], nil
 	}
 	return audit.NewMultiSink(logger, sinks...), nil
+}
+
+func containsSink(sinks []audit.Sink, target audit.Sink) bool {
+	for _, s := range sinks {
+		if s == target {
+			return true
+		}
+	}
+	return false
 }
 
 func buildConfiguredSinks(cfg *config.Config, logger *slog.Logger, version string, history *audit.HistoryBuffer) ([]audit.Sink, error) {
@@ -856,7 +883,8 @@ func selectBackend(cfg *config.Config, logger *slog.Logger) (rules.Backend, erro
 			return nil, fmt.Errorf("nftables: %w", err)
 		}
 		b.SetStateful(cfg.StatefulAccept)
-		logger.Info("using nftables backend", "stateful_accept", cfg.StatefulAccept)
+		b.SetDefaultDropLogRate(cfg.DefaultDropLogRate())
+		logger.Info("using nftables backend", "stateful_accept", cfg.StatefulAccept, "default_drop_log_rate", cfg.DefaultDropLogRate())
 		return b, nil
 	default:
 		b, err := rules.NewIPTablesBackend(chain, cfg.ParentChain)
@@ -864,7 +892,8 @@ func selectBackend(cfg *config.Config, logger *slog.Logger) (rules.Backend, erro
 			return nil, fmt.Errorf("iptables: %w", err)
 		}
 		b.SetStateful(cfg.StatefulAccept)
-		logger.Info("using iptables backend", "stateful_accept", cfg.StatefulAccept)
+		b.SetDefaultDropLogRate(cfg.DefaultDropLogRate())
+		logger.Info("using iptables backend", "stateful_accept", cfg.StatefulAccept, "default_drop_log_rate", cfg.DefaultDropLogRate())
 		return b, nil
 	}
 }

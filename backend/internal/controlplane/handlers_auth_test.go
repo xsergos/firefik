@@ -330,3 +330,46 @@ func TestClientIPFromRequest(t *testing.T) {
 		t.Fatalf("X-Real-IP precedence: got %q", got)
 	}
 }
+
+func TestHandlePanelSession(t *testing.T) {
+	srv, st := makeAuthEnabledServer(t, "alice", "s3cret")
+	h := srv.Handler()
+
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/panel-session", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("no session: got %d want 401", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/panel-session", nil)
+	req.Header.Set("Authorization", "Bearer "+srv.operatorBearer())
+	h.ServeHTTP(rec, req)
+	if srv.operatorBearer() != "" && rec.Code != http.StatusUnauthorized {
+		t.Fatalf("operator bearer must not unlock the session check, got %d", rec.Code)
+	}
+
+	sess, _ := st.Create("alice")
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/v1/panel-session", nil)
+	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: sess.ID})
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("valid session: got %d want 204", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/panel-session", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("post: got %d", rec.Code)
+	}
+}
+
+func TestHandlePanelSession_NoLoginConfigured(t *testing.T) {
+	srv, _ := newTestHTTPServer(t)
+	rec := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/panel-session", nil))
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("without a login the panel is open; got %d want 204", rec.Code)
+	}
+}

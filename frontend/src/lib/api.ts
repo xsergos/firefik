@@ -250,7 +250,12 @@ export async function validatePolicy(dsl: string): Promise<PolicyValidateRespons
 
 export async function simulatePolicy(
   name: string,
-  opts: { containerID?: string; dsl?: string; labels?: Record<string, string> },
+  opts: {
+    containerID?: string;
+    agentID?: string;
+    dsl?: string;
+    labels?: Record<string, string>;
+  },
 ): Promise<PolicySimulateResponse> {
   const res = await fetch(`${BASE_URL}/api/policies/${encodeURIComponent(name)}/simulate`, {
     method: "POST",

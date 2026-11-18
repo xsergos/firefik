@@ -52,6 +52,7 @@ type Store interface {
 	RecordAck(ctx context.Context, ack CommandAck) error
 	ListAgents(ctx context.Context) ([]AgentRecord, error)
 	GetAgent(ctx context.Context, agentID string) (AgentRecord, bool, error)
+	DeleteAgent(ctx context.Context, agentID string) (bool, error)
 	LatestSnapshot(ctx context.Context, agentID string) (*AgentSnapshot, error)
 	SetPolicyVersion(ctx context.Context, name, dsl, author, comment string) (PolicyVersion, error)
 	GetPolicyVersion(ctx context.Context, name string) (PolicyVersion, error)
@@ -85,6 +86,9 @@ type Store interface {
 	RevokeAgentToken(ctx context.Context, id string) error
 	ValidateAgentToken(ctx context.Context, plaintext string) (AgentToken, error)
 	TouchAgentToken(ctx context.Context, id, ip string) error
+	RecordFlows(ctx context.Context, batch []FlowRecord) error
+	QueryFlows(ctx context.Context, q FlowQuery) (FlowResult, error)
+	PruneFlows(ctx context.Context, olderThan time.Duration) (int, error)
 	Close() error
 }
 
@@ -844,6 +848,35 @@ func (s *sqliteStore) DeleteProposal(ctx context.Context, agentID, containerID s
 	return err
 }
 
+func (s *sqliteStore) DeleteAgent(ctx context.Context, agentID string) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, q := range []string{
+		`DELETE FROM commands WHERE agent_id = ?`,
+		`DELETE FROM autogen_proposals WHERE agent_id = ?`,
+		`DELETE FROM snapshots WHERE agent_id = ?`,
+	} {
+		if _, err := tx.ExecContext(ctx, q, agentID); err != nil {
+			return false, err
+		}
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM agents WHERE id = ?`, agentID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
 func (s *sqliteStore) ListAuditEvents(ctx context.Context, agentID string, limit int) ([]AuditRecord, error) {
 	if limit <= 0 {
 		limit = 100
@@ -903,6 +936,7 @@ type memStore struct {
 	proposals   map[string]map[string]AutogenProposal
 	auditLog    []AuditRecord
 	agentTokens map[string]memAgentToken
+	flows       map[flowKey]FlowRecord
 }
 
 func NewMemoryStore() Store {
@@ -1080,6 +1114,17 @@ func (m *memStore) GetAgent(_ context.Context, agentID string) (AgentRecord, boo
 	defer m.mu.Unlock()
 	rec, ok := m.agents[agentID]
 	return rec, ok, nil
+}
+
+func (m *memStore) DeleteAgent(_ context.Context, agentID string) (bool, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.agents[agentID]
+	delete(m.agents, agentID)
+	delete(m.cmds, agentID)
+	delete(m.snapshots, agentID)
+	delete(m.proposals, agentID)
+	return ok, nil
 }
 
 func (m *memStore) ListAgents(_ context.Context) ([]AgentRecord, error) {

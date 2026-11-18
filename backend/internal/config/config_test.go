@@ -64,6 +64,33 @@ func TestValidateChainSuffix(t *testing.T) {
 	}
 }
 
+func TestDefaultDropLogRate(t *testing.T) {
+	cases := []struct {
+		name    string
+		enabled bool
+		rate    int
+		want    int
+	}{
+		{"on by default rate", true, 10, 10},
+		{"disabled", false, 10, 0},
+		{"zero rate disables", true, 0, 0},
+		{"capped", true, 50000, 1000},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Config{LogDefaultDrop: tc.enabled, LogDefaultDropRate: tc.rate}
+			if got := c.DefaultDropLogRate(); got != tc.want {
+				t.Fatalf("got %d, want %d", got, tc.want)
+			}
+		})
+	}
+	t.Setenv("FIREFIK_LOG_DEFAULT_DROP", "")
+	t.Setenv("FIREFIK_LOG_DEFAULT_DROP_RATE", "")
+	if got := Load().DefaultDropLogRate(); got != 10 {
+		t.Fatalf("default load rate = %d, want 10", got)
+	}
+}
+
 func TestControlPlaneProxyURL(t *testing.T) {
 	cases := []struct {
 		name, http, admin, want string

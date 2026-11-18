@@ -5,18 +5,29 @@ export const rateLimitSchema = z.object({
   burst: z.number().nonnegative(),
 });
 
+function listOrEmpty<T extends z.ZodType>(item: T) {
+  return z
+    .array(item)
+    .nullish()
+    .transform((v): z.output<T>[] => v ?? []);
+}
+
+function optionalList<T extends z.ZodType>(item: T) {
+  return z.preprocess((v) => v ?? undefined, z.array(item).optional());
+}
+
 export const firewallRuleSetSchema = z.object({
   name: z.string(),
-  ports: z.array(z.number().int().min(0).max(65535)).default([]),
-  allowlist: z.array(z.string()).default([]),
-  blocklist: z.array(z.string()).default([]),
+  ports: listOrEmpty(z.number().int().min(0).max(65535)),
+  allowlist: listOrEmpty(z.string()),
+  blocklist: listOrEmpty(z.string()),
   profile: z.string().optional(),
   protocol: z.string().optional(),
   log: z.boolean().optional(),
   logPrefix: z.string().optional(),
   rateLimit: rateLimitSchema.optional(),
-  geoBlock: z.array(z.string()).optional(),
-  geoAllow: z.array(z.string()).optional(),
+  geoBlock: optionalList(z.string()),
+  geoAllow: optionalList(z.string()),
 });
 
 export const firewallStatusSchema = z.enum(["disabled", "active", "inactive"]);
@@ -45,12 +56,22 @@ export const logEntrySchema = z.object({
   ts: z.string(),
   raw: z.string().optional().default(""),
   action: z.enum(["ACCEPT", "DROP"]).optional(),
+  rule: z.string().optional(),
   srcIP: z.string().optional(),
+  dstIP: z.string().optional(),
   dstPort: z.number().optional(),
   container: z.string().optional(),
   containerID: z.string().optional(),
   containerName: z.string().optional(),
   proto: z.string().optional(),
+  agent: z.string().optional(),
+});
+
+export const controlPlaneLogLineSchema = z.object({
+  agent: z.object({ instance_id: z.string(), hostname: z.string().optional() }),
+  at: z.string(),
+  source: z.string().optional(),
+  line: z.string(),
 });
 
 export const logStreamMessageSchema = z.union([
@@ -171,10 +192,10 @@ export const policySimulateResponseSchema = z.object({
   policy: z.string(),
   container: z.string().optional(),
   defaultPolicy: z.string().optional(),
-  ruleSets: z.array(firewallRuleSetSchema),
-  warnings: z.array(z.string()).optional(),
-  errors: z.array(z.string()).optional(),
-  labelsSeen: z.record(z.string(), z.string()).optional(),
+  ruleSets: listOrEmpty(firewallRuleSetSchema),
+  warnings: optionalList(z.string()),
+  errors: optionalList(z.string()),
+  labelsSeen: z.record(z.string(), z.string()).nullish(),
 });
 export type PolicySimulateResponse = z.infer<typeof policySimulateResponseSchema>;
 
@@ -211,6 +232,7 @@ export const auditHistoryEventSchema = z.object({
   ts: z.string(),
   action: z.string(),
   source: z.string(),
+  actor: z.string().optional(),
   container_id: z.string().optional(),
   container_name: z.string().optional(),
   container_ips: z.array(z.string()).optional(),

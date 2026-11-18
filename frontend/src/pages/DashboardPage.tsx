@@ -1,8 +1,12 @@
 import { lazy, Suspense, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchStats } from "@/lib/api";
-import { fetchFleetStats } from "@/lib/fleetApi";
+import { fetchFleetStats, fetchFlows } from "@/lib/fleetApi";
+import { useContainers } from "@/hooks/useContainers";
+import { plural } from "@/lib/firewallState";
 import { isPanelMode } from "@/lib/panelMode";
 import { queryKeys } from "@/lib/queryKeys";
 import type { StatsResponse } from "@/types/api";
@@ -20,9 +24,16 @@ function useStats() {
 }
 
 const MAX_POINTS = 300;
+const SOURCE_BUCKET_MINUTES = 1;
 
-function downsample(points: StatsResponse["traffic"]): StatsResponse["traffic"] {
-  if (points.length <= MAX_POINTS) return points;
+type Series = { points: StatsResponse["traffic"]; bucketMinutes: number };
+
+function unitLabel(bucketMinutes: number): string {
+  return bucketMinutes === 1 ? "packets/min" : `packets per ${bucketMinutes} min`;
+}
+
+function downsample(points: StatsResponse["traffic"]): Series {
+  if (points.length <= MAX_POINTS) return { points, bucketMinutes: SOURCE_BUCKET_MINUTES };
   const bucketSize = Math.ceil(points.length / MAX_POINTS);
   const out: StatsResponse["traffic"] = [];
   for (let i = 0; i < points.length; i += bucketSize) {
@@ -37,8 +48,10 @@ function downsample(points: StatsResponse["traffic"]): StatsResponse["traffic"] 
     if (!first) continue;
     out.push({ ts: first.ts, accepted, dropped });
   }
-  return out;
+  return { points: out, bucketMinutes: bucketSize * SOURCE_BUCKET_MINUTES };
 }
+
+const EMPTY_SERIES: Series = { points: [], bucketMinutes: SOURCE_BUCKET_MINUTES };
 
 function useFleetStats() {
   return useQuery<FleetStats>({
@@ -48,9 +61,83 @@ function useFleetStats() {
   });
 }
 
+type AttentionItem = { key: string; text: string; to: string };
+
+function NeedsAttention({ items }: { items: AttentionItem[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section
+      aria-labelledby="needs-attention-title"
+      className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3"
+    >
+      <h2
+        id="needs-attention-title"
+        className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300"
+      >
+        <AlertTriangle className="h-4 w-4" aria-hidden />
+        Needs attention
+      </h2>
+      <ul className="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+        {items.map((item) => (
+          <li key={item.key}>
+            <Link to={item.to} className="underline underline-offset-2 hover:text-foreground">
+              {item.text}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function useAttentionItems(agents: FleetStats["agents"] | undefined): AttentionItem[] {
+  const containers = useContainers();
+  const drops = useQuery({
+    queryKey: ["flows", { since: "1h", action: "DROP" }],
+    queryFn: () => fetchFlows({ since: "1h", action: "DROP" }),
+    refetchInterval: 60_000,
+  });
+  const items: AttentionItem[] = [];
+  if (agents?.dead) {
+    items.push({
+      key: "dead",
+      text: `${plural(agents.dead, "agent")} stopped reporting`,
+      to: "/fleet?status=dead",
+    });
+  }
+  if (agents?.stale) {
+    items.push({
+      key: "stale",
+      text: `${plural(agents.stale, "agent")} reporting late`,
+      to: "/fleet?status=stale",
+    });
+  }
+  const pending = (containers.data ?? []).filter((c) => c.firewallStatus === "inactive").length;
+  if (pending) {
+    items.push({
+      key: "pending",
+      text: `${plural(pending, "container")} waiting for firewall rules to be applied`,
+      to: "/containers?firewall=inactive",
+    });
+  }
+  const dropped = drops.data?.summary.total ?? 0;
+  if (dropped) {
+    items.push({
+      key: "drops",
+      text: `${dropped.toLocaleString()} ${dropped === 1 ? "packet" : "packets"} dropped in the last hour`,
+      to: "/logs",
+    });
+  }
+  return items;
+}
+
 function FleetDashboard() {
   const { data, isLoading, isError } = useFleetStats();
-  const fleetTraffic = useMemo(() => (data?.traffic ? downsample(data.traffic) : []), [data]);
+  const attention = useAttentionItems(data?.agents);
+  const fleetTraffic = useMemo(
+    () => (data?.traffic ? downsample(data.traffic) : EMPTY_SERIES),
+    [data],
+  );
   if (isError) {
     return (
       <TableError label="Failed to load fleet stats. Make sure the control plane is running." />
@@ -60,28 +147,60 @@ function FleetDashboard() {
   const c = data?.containers ?? { total: 0, running: 0, enabled: 0 };
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Fleet dashboard</h1>
+      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <NeedsAttention items={attention} />
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-4">
-        <StatCard title="Agents (total)" value={isLoading ? "…" : String(a.total)} />
-        <StatCard title="Healthy" value={isLoading ? "…" : String(a.healthy)} />
-        <StatCard title="Stale" value={isLoading ? "…" : String(a.stale)} />
-        <StatCard title="Dead" value={isLoading ? "…" : String(a.dead)} />
+        <StatCard title="Agents (total)" value={isLoading ? "…" : String(a.total)} to="/fleet" />
+        <StatCard
+          title="Healthy"
+          value={isLoading ? "…" : String(a.healthy)}
+          to="/fleet?status=healthy"
+        />
+        <StatCard
+          title="Stale"
+          value={isLoading ? "…" : String(a.stale)}
+          to="/fleet?status=stale"
+        />
+        <StatCard title="Dead" value={isLoading ? "…" : String(a.dead)} to="/fleet?status=dead" />
       </div>
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-        <StatCard title="Containers (total)" value={isLoading ? "…" : String(c.total)} />
-        <StatCard title="Running" value={isLoading ? "…" : String(c.running)} />
-        <StatCard title="Firewall enabled" value={isLoading ? "…" : String(c.enabled)} />
+        <StatCard
+          title="Containers (total)"
+          value={isLoading ? "…" : String(c.total)}
+          to="/containers"
+        />
+        <StatCard
+          title="Running"
+          value={isLoading ? "…" : String(c.running)}
+          to="/containers?running=1"
+        />
+        <StatCard
+          title="Firewall active"
+          value={isLoading ? "…" : String(c.enabled)}
+          to="/containers?firewall=active"
+        />
       </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Fleet traffic (sum across all agents)</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Counts logged packets only: default-policy drops and rules with logging on. See the{" "}
+            <Link to="/logs" className="underline">
+              Traffic log
+            </Link>{" "}
+            for details.
+          </p>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <TableLoading label="Loading traffic data…" />
-          ) : fleetTraffic.length > 0 ? (
+          ) : fleetTraffic.points.length > 0 ? (
             <Suspense fallback={<TableLoading label="Loading traffic data…" />}>
-              <TrafficChart data={fleetTraffic} gradientPrefix="colorFleet" />
+              <TrafficChart
+                data={fleetTraffic.points}
+                gradientPrefix="colorFleet"
+                unit={unitLabel(fleetTraffic.bucketMinutes)}
+              />
             </Suspense>
           ) : (
             <p className="text-sm text-muted-foreground py-10 text-center">
@@ -104,7 +223,7 @@ export default function DashboardPage() {
 function SingleAgentDashboard() {
   const { data, isLoading, isError } = useStats();
 
-  const traffic = useMemo(() => (data?.traffic ? downsample(data.traffic) : []), [data]);
+  const traffic = useMemo(() => (data?.traffic ? downsample(data.traffic) : EMPTY_SERIES), [data]);
 
   if (isError)
     return <TableError label="Failed to load dashboard stats. Make sure the backend is running." />;
@@ -118,21 +237,44 @@ function SingleAgentDashboard() {
       <h1 className="text-2xl font-bold">Dashboard</h1>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
-        <StatCard title="Total containers" value={isLoading ? "…" : String(total)} />
-        <StatCard title="Running" value={isLoading ? "…" : String(running)} />
-        <StatCard title="Firewall enabled" value={isLoading ? "…" : String(enabled)} />
+        <StatCard
+          title="Total containers"
+          value={isLoading ? "…" : String(total)}
+          to="/containers"
+        />
+        <StatCard
+          title="Running"
+          value={isLoading ? "…" : String(running)}
+          to="/containers?running=1"
+        />
+        <StatCard
+          title="Firewall active"
+          value={isLoading ? "…" : String(enabled)}
+          to="/containers?firewall=active"
+        />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Traffic (last 60 min)</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Counts logged packets only: default-policy drops and rules with logging on. See the{" "}
+            <Link to="/logs" className="underline">
+              Traffic log
+            </Link>{" "}
+            for details.
+          </p>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <TableLoading label="Loading traffic data…" />
-          ) : traffic.length > 0 ? (
+          ) : traffic.points.length > 0 ? (
             <Suspense fallback={<TableLoading label="Loading traffic data…" />}>
-              <TrafficChart data={traffic} gradientPrefix="color" />
+              <TrafficChart
+                data={traffic.points}
+                gradientPrefix="color"
+                unit={unitLabel(traffic.bucketMinutes)}
+              />
             </Suspense>
           ) : (
             <p className="text-sm text-muted-foreground py-10 text-center">
@@ -145,15 +287,20 @@ function SingleAgentDashboard() {
   );
 }
 
-function StatCard({ title, value }: { title: string; value: string }) {
+function StatCard({ title, value, to }: { title: string; value: string; to: string }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-3xl font-bold">{value}</p>
-      </CardContent>
-    </Card>
+    <Link
+      to={to}
+      className="group block rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
+      <Card className="h-full transition-colors group-hover:bg-muted/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-3xl font-bold">{value}</p>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }

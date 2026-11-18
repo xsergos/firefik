@@ -14,15 +14,21 @@ import (
 )
 
 type LogEntry struct {
-	Timestamp string `json:"ts"`
-	Raw       string `json:"raw"`
-	Action    string `json:"action,omitempty"`
-	SrcIP     string `json:"srcIP,omitempty"`
-	DstIP     string `json:"dstIP,omitempty"`
-	DstPort   int    `json:"dstPort,omitempty"`
-	Container string `json:"container,omitempty"`
-	Proto     string `json:"proto,omitempty"`
+	Timestamp   string `json:"ts"`
+	Raw         string `json:"raw"`
+	Action      string `json:"action,omitempty"`
+	Rule        string `json:"rule,omitempty"`
+	SrcIP       string `json:"srcIP,omitempty"`
+	DstIP       string `json:"dstIP,omitempty"`
+	DstPort     int    `json:"dstPort,omitempty"`
+	Container   string `json:"container,omitempty"`
+	ContainerID string `json:"containerID,omitempty"`
+	Proto       string `json:"proto,omitempty"`
 }
+
+type ContainerResolver func(ip string) (id, name string)
+
+const HostContainer = "host"
 
 type FlowEvent struct {
 	Action  string
@@ -39,6 +45,7 @@ func StartNflogReader(
 	logger *slog.Logger,
 	onAction func(action string),
 	onFlow func(FlowEvent),
+	resolve ContainerResolver,
 ) error {
 	config := nflog.Config{
 		Group:    nflogGroup,
@@ -66,6 +73,7 @@ func StartNflogReader(
 		if !ok {
 			return 0
 		}
+		attachContainer(&entry, resolve)
 
 		b, err := json.Marshal(entry)
 		if err != nil {
@@ -103,23 +111,70 @@ func StartNflogReader(
 }
 
 func buildLogEntry(prefix string, payload []byte, timestamp string) (LogEntry, bool) {
-	if !strings.Contains(prefix, "FIREFIK") {
+	action, rule, ok := parsePrefix(prefix)
+	if !ok {
 		return LogEntry{}, false
 	}
 	entry := LogEntry{
 		Timestamp: timestamp,
 		Raw:       prefix,
-	}
-	if strings.Contains(prefix, "FIREFIK DROP") {
-		entry.Action = "DROP"
-	} else if strings.Contains(prefix, "FIREFIK ACCEPT") {
-		entry.Action = "ACCEPT"
+		Action:    action,
+		Rule:      rule,
 	}
 
 	if len(payload) > 0 {
 		decodePacket(payload, &entry)
 	}
 	return entry, true
+}
+
+func parsePrefix(prefix string) (action, rule string, ok bool) {
+	idx := strings.Index(strings.ToUpper(prefix), "FIREFIK")
+	if idx < 0 {
+		return "", "", false
+	}
+	rest := strings.TrimLeft(prefix[idx+len("FIREFIK"):], " -")
+	if upper := strings.ToUpper(rest); strings.HasPrefix(upper, "HOST-") {
+		return actionWord(rest[len("HOST-"):]), "host", true
+	}
+	word, remainder, _ := strings.Cut(rest, " ")
+	if a := actionWord(word); a != "" {
+		return a, strings.TrimSpace(remainder), true
+	}
+	return "", strings.TrimSpace(rest), true
+}
+
+func actionWord(s string) string {
+	switch strings.ToUpper(strings.TrimSpace(s)) {
+	case "DROP":
+		return "DROP"
+	case "ACCEPT":
+		return "ACCEPT"
+	}
+	return ""
+}
+
+func attachContainer(entry *LogEntry, resolve ContainerResolver) {
+	if entry.Rule == HostContainer || strings.HasPrefix(entry.Rule, HostContainer+" ") {
+		entry.Container = HostContainer
+		return
+	}
+	if resolve == nil {
+		return
+	}
+	for _, ip := range []string{entry.DstIP, entry.SrcIP} {
+		if ip == "" {
+			continue
+		}
+		if id, name := resolve(ip); id != "" {
+			entry.ContainerID = id
+			entry.Container = name
+			if entry.Container == "" {
+				entry.Container = id
+			}
+			return
+		}
+	}
 }
 
 func decodePacket(payload []byte, entry *LogEntry) {

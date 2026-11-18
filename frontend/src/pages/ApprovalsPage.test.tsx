@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,7 +26,9 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <ApprovalsPage />
+      <MemoryRouter>
+        <ApprovalsPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -200,6 +203,75 @@ describe("ApprovalsPage", () => {
     await waitFor(() =>
       expect(screen.getByText(/No approvals match the selected status/i)).toBeInTheDocument(),
     );
+  });
+
+  it("has an Approvals heading and points the empty state at Send for review", async () => {
+    const api = await import("@/lib/controlPlaneApi");
+    vi.mocked(api.fetchApprovals).mockResolvedValue([]);
+    renderPage();
+    expect(screen.getByRole("heading", { level: 1, name: "Approvals" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Send for review")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "Policies" })).toHaveAttribute("href", "/policies");
+  });
+
+  it("explains a 403 from the control plane in plain words", async () => {
+    const user = userEvent.setup();
+    const api = await import("@/lib/controlPlaneApi");
+    const { APIError } = await import("@/lib/api");
+    const { toast } = await import("sonner");
+    vi.mocked(api.approveApproval).mockRejectedValue(
+      new APIError(403, "request_failed", "self-approve forbidden"),
+    );
+    renderPage();
+    await waitFor(() => expect(screen.getByText("web-allow")).toBeInTheDocument());
+    await user.type(screen.getByLabelText("Your name"), "bob");
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "You cannot approve or reject a request you sent yourself.",
+      ),
+    );
+  });
+
+  it("says honestly that panel requests cannot be approved from the panel", async () => {
+    const api = await import("@/lib/controlPlaneApi");
+    vi.mocked(api.fetchApprovals).mockResolvedValue([]);
+    renderPage();
+    expect(
+      screen.getByText(
+        /Requests sent from this panel cannot be approved from this panel yet, because/,
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByText(/No approvals match the selected status/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/until a different operator approves/)).not.toBeInTheDocument();
+  });
+
+  it("hides Approve and Reject on requests from the panel's own identity after a 403", async () => {
+    const user = userEvent.setup();
+    const api = await import("@/lib/controlPlaneApi");
+    const { APIError } = await import("@/lib/api");
+    const other: PendingApproval = {
+      ...pending,
+      id: "ap-other",
+      policy_name: "other-policy",
+      requester_fingerprint: "sha256:carol",
+    };
+    const sibling: PendingApproval = { ...pending, id: "ap-sibling", policy_name: "sibling" };
+    vi.mocked(api.fetchApprovals).mockResolvedValue([pending, sibling, other]);
+    vi.mocked(api.approveApproval).mockRejectedValue(
+      new APIError(403, "request_failed", "self-approve forbidden"),
+    );
+    renderPage();
+    await waitFor(() => expect(screen.getByText("web-allow")).toBeInTheDocument());
+    expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(3);
+
+    await user.type(screen.getAllByLabelText("Your name")[0]!, "bob");
+    await user.click(screen.getAllByRole("button", { name: "Approve" })[0]!);
+
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Approve" })).toHaveLength(1));
+    expect(screen.getAllByText(/cannot be approved or rejected here/)).toHaveLength(2);
   });
 
   it("renders the error state when fetch fails", async () => {

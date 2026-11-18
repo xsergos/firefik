@@ -16,6 +16,8 @@ import (
 	"firefik/internal/controlplane"
 	"firefik/internal/docker"
 	"firefik/internal/rules"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type fakeDockerReader struct {
@@ -91,6 +93,9 @@ func TestDispatcher_StatsCollect(t *testing.T) {
 	}
 	if total, _ := containers["total"].(int); total != 2 {
 		t.Errorf("total: %v", containers["total"])
+	}
+	if _, err := structpb.NewStruct(ack.ResultPayload); err != nil {
+		t.Fatalf("stats payload must survive the gRPC struct encoding: %v", err)
 	}
 }
 

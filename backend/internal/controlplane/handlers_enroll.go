@@ -68,13 +68,11 @@ func (s *HTTPServer) createEnrollmentToken(w http.ResponseWriter, r *http.Reques
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if s.Audit != nil {
-		s.Audit.Emit("enrollment_token_created", map[string]string{
-			"agent_id":   req.AgentID,
-			"token":      token[:8] + "…",
-			"expires_at": et.ExpiresAt.Format(time.RFC3339),
-		})
-	}
+	s.recordChange(r, "enrollment_token_created", "", map[string]string{
+		"for_agent":  req.AgentID,
+		"token":      token[:8] + "…",
+		"expires_at": et.ExpiresAt.Format(time.RFC3339),
+	})
 	writeJSON(w, http.StatusCreated, createEnrollmentTokenResponse{
 		Token:     token,
 		AgentID:   req.AgentID,

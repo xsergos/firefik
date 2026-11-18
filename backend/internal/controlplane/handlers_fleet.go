@@ -112,6 +112,8 @@ func (s *HTTPServer) handleAgent(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case sub == "" && r.Method == http.MethodGet:
 		writeJSON(w, http.StatusOK, agentDetailDTO{Agent: toAgentDTO(rec)})
+	case sub == "" && r.Method == http.MethodDelete:
+		s.deleteAgent(w, r, rec)
 	case sub == "snapshot" && r.Method == http.MethodGet:
 		snap, err := s.Registry.store.LatestSnapshot(r.Context(), id)
 		if err != nil {
@@ -128,6 +130,28 @@ func (s *HTTPServer) handleAgent(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method or subresource not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *HTTPServer) deleteAgent(w http.ResponseWriter, r *http.Request, rec AgentRecord) {
+	id := rec.Identity.InstanceID
+	if agentStatus(rec.LastSeen, time.Now().UTC()) == "healthy" {
+		http.Error(w, "agent is online and would re-register; stop it before deleting", http.StatusConflict)
+		return
+	}
+	removed, err := s.Registry.RemoveAgent(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !removed {
+		http.Error(w, "agent not found", http.StatusNotFound)
+		return
+	}
+	s.recordChange(r, "agent_deleted", id, map[string]string{
+		"hostname":  rec.Identity.Hostname,
+		"last_seen": rec.LastSeen.UTC().Format(time.RFC3339),
+	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *HTTPServer) dispatchCommand(w http.ResponseWriter, r *http.Request, agentID string) {
@@ -152,14 +176,11 @@ func (s *HTTPServer) dispatchCommand(w http.ResponseWriter, r *http.Request, age
 		IssuedAt:    time.Now().UTC(),
 	}
 	s.Registry.Enqueue(agentID, cmd)
-	if s.Audit != nil {
-		s.Audit.Emit("agent_command", map[string]string{
-			"agent_id":     agentID,
-			"command_id":   cmd.ID,
-			"action":       string(kind),
-			"container_id": req.ContainerID,
-		})
-	}
+	s.recordChange(r, "agent_command", agentID, map[string]string{
+		"command_id":   cmd.ID,
+		"command":      string(kind),
+		"container_id": req.ContainerID,
+	})
 	writeJSON(w, http.StatusAccepted, commandResponse{ID: cmd.ID, AgentID: agentID, Action: string(kind)})
 }
 

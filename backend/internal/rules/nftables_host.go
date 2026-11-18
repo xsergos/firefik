@@ -57,7 +57,7 @@ func (b *NFTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		}
 		for _, peer := range rule.Blocklist {
 			if rule.Log {
-				if err := b.addHostNflog(chain, proto, rule.Ports, peer, rule.LogPrefix, "DROP"); err != nil {
+				if err := b.addHostNflog(chain, proto, rule.Ports, peer, hostLogLabel(rule.LogPrefix, rule.Name), "DROP"); err != nil {
 					return fmt.Errorf("host rule %q blocklist log %s: %w", rule.Name, peer.String(), err)
 				}
 			}
@@ -67,7 +67,7 @@ func (b *NFTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		}
 		for _, peer := range rule.Allowlist {
 			if rule.Log {
-				if err := b.addHostNflog(chain, proto, rule.Ports, peer, rule.LogPrefix, "ACCEPT"); err != nil {
+				if err := b.addHostNflog(chain, proto, rule.Ports, peer, hostLogLabel(rule.LogPrefix, rule.Name), "ACCEPT"); err != nil {
 					return fmt.Errorf("host rule %q allowlist log %s: %w", rule.Name, peer.String(), err)
 				}
 			}
@@ -77,7 +77,7 @@ func (b *NFTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		}
 		if len(rule.Allowlist) == 0 && len(rule.Blocklist) == 0 {
 			if rule.Log {
-				if err := b.addHostNflog(chain, proto, rule.Ports, net.IPNet{}, rule.LogPrefix, "ACCEPT"); err != nil {
+				if err := b.addHostNflog(chain, proto, rule.Ports, net.IPNet{}, hostLogLabel(rule.LogPrefix, rule.Name), "ACCEPT"); err != nil {
 					return fmt.Errorf("host rule %q bare allow log: %w", rule.Name, err)
 				}
 			}
@@ -85,6 +85,14 @@ func (b *NFTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 				return fmt.Errorf("host rule %q bare allow: %w", rule.Name, err)
 			}
 		}
+	}
+
+	if b.defaultDropLog > 0 && NormaliseHostDefault(defaultPolicy) == "DROP" {
+		b.conn.AddRule(&nftables.Rule{
+			Table: b.table,
+			Chain: chain,
+			Exprs: defaultDropLogExprs(b.defaultDropLog, HostLogLabelPrefix+" "+DefaultPolicyLogLabel),
+		})
 	}
 
 	return b.conn.Flush()
@@ -162,22 +170,15 @@ func (b *NFTablesBackend) addHostNflog(
 	proto string,
 	ports []uint16,
 	peer net.IPNet,
-	logPrefix, actionType string,
+	label, actionType string,
 ) error {
-	prefix := strings.TrimSpace(logPrefix)
-	if prefix == "" {
-		prefix = "firefik-host-" + actionType
-	}
-	if len(prefix) > LogPrefixMaxLen {
-		prefix = prefix[:LogPrefixMaxLen]
-	}
 	build := func(matchExtra []expr.Any) {
 		exprs := make([]expr.Any, 0, 8+len(matchExtra))
 		if peer.IP != nil {
 			exprs = append(exprs, srcNetMatchExprs(peer)...)
 		}
 		exprs = append(exprs, matchExtra...)
-		exprs = append(exprs, nflogExpr(prefix, actionType))
+		exprs = append(exprs, nflogExpr(label, actionType))
 		b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: chain, Exprs: exprs})
 	}
 	if proto == "tcp" || proto == "udp" {

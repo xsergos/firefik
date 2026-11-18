@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 )
@@ -200,4 +201,49 @@ func writeTestCA(t *testing.T, dir string) string {
 		t.Fatal(err)
 	}
 	return p
+}
+
+type chanAuditSource struct{ ch chan map[string]any }
+
+func (c chanAuditSource) Audits() <-chan map[string]any { return c.ch }
+
+type recordingAuditSender struct {
+	mu   sync.Mutex
+	sent []map[string]any
+}
+
+func (r *recordingAuditSender) SendAudit(ev map[string]any) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.sent = append(r.sent, ev)
+	return nil
+}
+
+func (r *recordingAuditSender) count() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.sent)
+}
+
+func TestAuditForwarderSendsEvents(t *testing.T) {
+	src := chanAuditSource{ch: make(chan map[string]any, 2)}
+	l := NewAgentLoop(AgentLoopConfig{}, AgentIdentity{InstanceID: "x"}, &fakeAgentSource{}, nil, nil).WithAuditSource(src)
+	sender := &recordingAuditSender{}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		l.auditForwarder(ctx, sender)
+		close(done)
+	}()
+	src.ch <- map[string]any{"action": "apply"}
+	src.ch <- map[string]any{"action": "policy_updated"}
+	deadline := time.Now().Add(time.Second)
+	for sender.count() < 2 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	cancel()
+	<-done
+	if sender.count() != 2 {
+		t.Fatalf("forwarded %d events, want 2", sender.count())
+	}
 }

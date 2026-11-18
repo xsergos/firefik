@@ -226,6 +226,93 @@ func TestPolicySimulate(t *testing.T) {
 	}
 }
 
+func TestPolicySimulate_EmptyListsAreArraysNotNull(t *testing.T) {
+	srv := panelServer(t)
+	dsl := `policy "web" { block if geo in ["RU", "CN"] }`
+	rec := httptest.NewRecorder()
+	body, _ := json.Marshal(map[string]any{"dsl": dsl})
+	req := httptest.NewRequest(http.MethodPost, "/v1/policies/web/simulate", bytes.NewReader(body))
+	srv.handlePolicy(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("simulate: %d body=%s", rec.Code, rec.Body.String())
+	}
+	raw := rec.Body.String()
+	for _, field := range []string{`"ports":null`, `"allowlist":null`, `"blocklist":null`} {
+		if strings.Contains(raw, field) {
+			t.Fatalf("response contains %s: %s", field, raw)
+		}
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	sets, _ := resp["ruleSets"].([]any)
+	if len(sets) == 0 {
+		t.Fatalf("expected rule sets, got %s", raw)
+	}
+	for _, s := range sets {
+		m := s.(map[string]any)
+		for _, key := range []string{"ports", "allowlist", "blocklist"} {
+			if _, ok := m[key].([]any); !ok {
+				t.Fatalf("%s should be an array, got %#v", key, m[key])
+			}
+		}
+	}
+}
+
+func TestPolicySimulate_ContainerFromSnapshot(t *testing.T) {
+	srv := panelServer(t)
+	ctx := context.Background()
+	_ = srv.Registry.store.UpsertAgent(ctx, AgentIdentity{InstanceID: "a1", Hostname: "h1"})
+	_ = srv.Registry.store.RecordSnapshot(ctx, AgentSnapshot{
+		Agent: AgentIdentity{InstanceID: "a1"},
+		At:    time.Now().UTC(),
+		Containers: []ContainerState{
+			{ID: "abcdef0123456789", Name: "web", DefaultPolicy: "RETURN", Labels: map[string]string{"firefik.policy": "other, web"}},
+			{ID: "1234567890abcdef", Name: "db", Labels: map[string]string{"firefik.enable": "true"}},
+		},
+	})
+	dsl := `policy "web" { allow if port == 80 }`
+
+	simulate := func(containerID, agentID string) policySimulateResponse {
+		t.Helper()
+		rec := httptest.NewRecorder()
+		body, _ := json.Marshal(map[string]any{"dsl": dsl, "containerID": containerID, "agentID": agentID})
+		req := httptest.NewRequest(http.MethodPost, "/v1/policies/web/simulate", bytes.NewReader(body))
+		srv.handlePolicy(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("simulate: %d body=%s", rec.Code, rec.Body.String())
+		}
+		var resp policySimulateResponse
+		_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+		return resp
+	}
+
+	resp := simulate("abcdef012345", "a1")
+	if resp.Container != "abcdef0123456789" {
+		t.Fatalf("container not resolved: %+v", resp)
+	}
+	if resp.DefaultPolicy != "RETURN" {
+		t.Fatalf("expected container default policy, got %q", resp.DefaultPolicy)
+	}
+	if resp.LabelsSeen["firefik.policy"] != "other, web" {
+		t.Fatalf("labels not echoed: %+v", resp.LabelsSeen)
+	}
+	if len(resp.Warnings) != 0 {
+		t.Fatalf("unexpected warnings: %v", resp.Warnings)
+	}
+
+	resp = simulate("1234567890ab", "")
+	if len(resp.Warnings) != 1 || !strings.Contains(resp.Warnings[0], "firefik.policy=web") {
+		t.Fatalf("expected missing-label warning, got %v", resp.Warnings)
+	}
+
+	resp = simulate("ffffffffffff", "")
+	if len(resp.Warnings) != 1 || !strings.Contains(resp.Warnings[0], "not found") {
+		t.Fatalf("expected not-found warning, got %v", resp.Warnings)
+	}
+}
+
 func TestPolicySimulate_FallbackToStored(t *testing.T) {
 	srv := panelServer(t)
 	ctx := context.Background()

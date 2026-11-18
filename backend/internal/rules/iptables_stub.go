@@ -21,9 +21,10 @@ func NewIP6TablesBackend(chainName, parentChain string) (*IPTablesBackend, error
 	return nil, fmt.Errorf("ip6tables backend is only supported on Linux")
 }
 
-func (b *IPTablesBackend) SetupChains() error { return nil }
-func (b *IPTablesBackend) Cleanup() error     { return nil }
-func (b *IPTablesBackend) SetStateful(v bool) {}
+func (b *IPTablesBackend) SetupChains() error                  { return nil }
+func (b *IPTablesBackend) Cleanup() error                      { return nil }
+func (b *IPTablesBackend) SetStateful(v bool)                  {}
+func (b *IPTablesBackend) SetDefaultDropLogRate(perSecond int) {}
 
 func (b *IPTablesBackend) ApplyContainerRules(
 	containerID, containerName string,

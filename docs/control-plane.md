@@ -264,6 +264,7 @@ authentication path satisfies the middleware:
 | `GET /v1/agents/{id}` | Single agent record. |
 | `GET /v1/agents/{id}/snapshot` | Latest reported snapshot (containers, firewall_status, default_policy, sources, rule_set_count). Empty `snapshot` field if the agent has not pushed yet. |
 | `POST /v1/agents/{id}/commands` | Enqueue a command. Body `{"action": "apply\|disable\|reconcile\|token_rotate", "container_id": "..."}`. `apply`/`disable` require `container_id`; `reconcile`/`token_rotate` are agent-wide. Returns `202 {"id","agent_id","action"}`. Audited as `agent_command`. |
+| `DELETE /v1/agents/{id}` | Remove a stale/dead agent with its snapshots, pending commands and autogen proposals. Audit history is kept. `409` while the agent is healthy (it would re-register), `404` if unknown, `204` on success. Recorded as `agent_deleted`. |
 | `GET /v1/agents/{id}/logs` | **WebSocket** — live tail of nflog forwarded by the agent. `Authorization: Bearer …` required on the upgrade request. Server sends `LogLine` JSON (`agent`, `at`, `level`, `source`, `line`, `fields`) and PINGs every 30s. |
 | `GET /v1/enrollment-tokens` | List active (unconsumed) enrollment tokens. `?include_used=1` includes consumed/revoked. |
 | `POST /v1/enrollment-tokens` | Issue a one-time enrollment token. Body `{"agent_id": "host-prod-01", "ttl_seconds": 900}`. `agent_id` must match `[a-z0-9-]{3,63}`; TTL defaults to 15 min, capped at 24 h. Returns `201 {"token","agent_id","expires_at","issued_at"}`. The token is single-use — `POST /v1/enroll` consumes it atomically. |
@@ -288,7 +289,10 @@ with a 5 s ack deadline.
 | `GET /v1/stats` | Fleet aggregator. Returns `{agents:{total,healthy,stale,dead,unknown}, containers:{total,running,enabled}}` computed over latest snapshots. |
 | `GET /v1/containers` | Flatten of `snapshots[].containers` across the fleet. Each row carries `agent_id`, `agent_hostname`, plus the standard container fields (id/name/status/firewallStatus/defaultPolicy/labels). |
 | `GET /v1/rules` | Same shape as `/v1/containers` but filtered to entries with `firewallStatus == active` or `rule_set_count > 0`. Detailed rule sets are *not* expanded — use `/v1/agents/{id}/snapshot` for per-container detail. |
-| `GET /v1/audit/history?agent_id=&limit=` | Fleet audit log read from `store.audit_events` (which is fed by `AgentEvent.audit` push). Optional `agent_id` filter; `limit` defaults to 100, capped at 1000. |
+| `GET /v1/audit/history?agent_id=&limit=` | Change history read from `store.audit_events`. Fed by agents (every agent audit event is forwarded over the gRPC stream) and by the panel (policy saves, container apply/disable, agent commands and removals, token and template changes; each row carries `actor` = session user or bearer fingerprint `@` client IP). Optional `agent_id` filter; `limit` defaults to 100, capped at 1000. |
+| `GET /v1/flows?since=&agent_id=&container=&src=&port=&action=&limit=` | Traffic log aggregated per hour from forwarded NFLOG events. `since` is `1h`, `24h`, `7d` or RFC3339 (default `24h`); `src` matches an address prefix; `action` is `DROP` or `ACCEPT`. Returns `{rows,summary:{total,unique_sources,top_port,top_port_count},hourly}`. Kept for `--flow-retention`. |
+| `GET /v1/policies/{name}/versions` | Up to 50 stored versions of a policy, newest first, with full DSL, author and comment. |
+| `GET /v1/panel-config` | Agent-facing enroll URL and gRPC endpoint from `--public-enroll-url` / `--public-grpc-endpoint`. |
 | `GET /v1/policies` | List policies in `store.policy_versions` (latest version per name). Includes `sha`, `committedAt`, derived `rules` count via `policy.Compile`. |
 | `GET /v1/policies/{name}` | Single policy detail with parsed `ruleSets` (rendered through `policy.Compile`). |
 | `PUT /v1/policies/{name}` | Save a new version. Body `{"dsl","comment","author"}`. DSL is parsed by `internal/policy.Parse` before commit; rejects with `400` on parse error. |

@@ -81,6 +81,9 @@ func run() error {
 	dbPath := flag.String("db", defaultDBPath(), "sqlite path; empty or ':memory:' means in-memory")
 	commandTTL := flag.Duration("command-ttl", 24*time.Hour, "pending commands older than this are expired")
 	auditRetention := flag.Duration("audit-retention", 90*24*time.Hour, "audit rows older than this are purged")
+	publicEnrollURL := flag.String("public-enroll-url", os.Getenv("FIREFIK_CP_PUBLIC_ENROLL_URL"), "agent-facing https URL that serves /v1/enroll; prefilled on the panel's Add agent page (env FIREFIK_CP_PUBLIC_ENROLL_URL)")
+	publicGRPC := flag.String("public-grpc-endpoint", os.Getenv("FIREFIK_CP_PUBLIC_GRPC"), "agent-facing host:port of the gRPC listener; prefilled on the panel's Add agent page (env FIREFIK_CP_PUBLIC_GRPC)")
+	flowRetention := flag.Duration("flow-retention", controlplane.DefaultFlowRetention, "dropped/accepted packet log rows older than this are purged (0 keeps forever)")
 	snapshotsPerAgent := flag.Int("snapshots-per-agent", 100, "max retained snapshot rows per agent")
 	retentionInterval := flag.Duration("retention-interval", 15*time.Minute, "how often the retention loop runs")
 	serverNamesCSV := flag.String("server-name", "", "comma-separated SAN list for the auto-issued CP server cert (DNS); default = hostname,controlplane")
@@ -173,6 +176,7 @@ func run() error {
 		store = controlplane.NewMemoryStore()
 	}
 	registry := controlplane.NewRegistryWithStore(logger, store)
+	registry.SetFlowRetention(*flowRetention)
 
 	auditFanOut := buildServerAudit(logger)
 	defer func() {
@@ -216,6 +220,10 @@ func run() error {
 		Audit:         auditFanOut,
 		Authenticator: panelAuth,
 		Sessions:      panelSessions,
+		PanelConfig: controlplane.PanelConfig{
+			EnrollURL:    strings.TrimRight(strings.TrimSpace(*publicEnrollURL), "/"),
+			GRPCEndpoint: strings.TrimSpace(*publicGRPC),
+		},
 	}
 
 	httpSrv := &http.Server{
@@ -244,6 +252,7 @@ func run() error {
 	go func() {
 		_ = registry.RunRetentionLoop(retentionCtx, *retentionInterval, *commandTTL, *auditRetention, *snapshotsPerAgent)
 	}()
+	go registry.RunFlowFlush(retentionCtx, controlplane.DefaultFlowFlushInterval)
 	go func() {
 		<-ctx.Done()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -431,14 +440,31 @@ func authenticateBearer(ctx context.Context, legacyToken string, store controlpl
 }
 
 func peerIPFromContext(ctx context.Context) string {
+	direct := ""
 	if p, ok := peer.FromContext(ctx); ok && p != nil && p.Addr != nil {
 		host, _, err := net.SplitHostPort(p.Addr.String())
 		if err == nil {
-			return host
+			direct = host
+		} else {
+			direct = p.Addr.String()
 		}
-		return p.Addr.String()
 	}
-	return ""
+	if ip := net.ParseIP(direct); ip == nil || !(ip.IsPrivate() || ip.IsLoopback()) {
+		return direct
+	}
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return direct
+	}
+	for _, key := range []string{"x-real-ip", "x-forwarded-for"} {
+		for _, v := range md.Get(key) {
+			first, _, _ := strings.Cut(v, ",")
+			if ip := net.ParseIP(strings.TrimSpace(first)); ip != nil {
+				return ip.String()
+			}
+		}
+	}
+	return direct
 }
 
 func defaultDBPath() string {

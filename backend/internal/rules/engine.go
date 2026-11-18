@@ -49,8 +49,9 @@ type Engine struct {
 	appliedHostRules []config.FileHostRuleSet
 	appliedHostDef   string
 
-	ipMu        sync.RWMutex
-	containerIP map[string]string
+	ipMu          sync.RWMutex
+	containerIP   map[string]string
+	containerName map[string]string
 }
 
 func (e *Engine) GetHostRules() ([]config.FileHostRuleSet, string) {
@@ -103,13 +104,36 @@ func (e *Engine) getTemplates() map[string]config.RuleTemplate {
 
 func NewEngine(backend Backend, dockerClient DockerReader, cfg *config.Config, logger *slog.Logger) *Engine {
 	return &Engine{
-		backend:     backend,
-		docker:      dockerClient,
-		cfg:         cfg,
-		logger:      logger,
-		applied:     make(map[string]docker.ContainerConfig),
-		containerIP: make(map[string]string),
+		backend:       backend,
+		docker:        dockerClient,
+		cfg:           cfg,
+		logger:        logger,
+		applied:       make(map[string]docker.ContainerConfig),
+		containerIP:   make(map[string]string),
+		containerName: make(map[string]string),
 	}
+}
+
+func (e *Engine) setContainerName(sid, name string) {
+	e.ipMu.Lock()
+	defer e.ipMu.Unlock()
+	if e.containerName == nil {
+		e.containerName = make(map[string]string)
+	}
+	e.containerName[sid] = strings.TrimPrefix(name, "/")
+}
+
+func (e *Engine) ContainerByIP(ip string) (id, name string) {
+	if ip == "" {
+		return "", ""
+	}
+	e.ipMu.RLock()
+	defer e.ipMu.RUnlock()
+	id = e.containerIP[ip]
+	if id == "" {
+		return "", ""
+	}
+	return id, e.containerName[id]
 }
 
 func (e *Engine) setContainerIPs(sid string, ips []net.IP) {
@@ -131,6 +155,7 @@ func (e *Engine) setContainerIPs(sid string, ips []net.IP) {
 func (e *Engine) dropContainerIPs(sid string) {
 	e.ipMu.Lock()
 	defer e.ipMu.Unlock()
+	delete(e.containerName, sid)
 	for ip, existing := range e.containerIP {
 		if existing == sid {
 			delete(e.containerIP, ip)
@@ -661,6 +686,7 @@ func (e *Engine) applyContainerInner(ctx context.Context, ctr docker.ContainerIn
 	allIPs = append(allIPs, ip4s...)
 	allIPs = append(allIPs, ip6s...)
 	e.setContainerIPs(sid, allIPs)
+	e.setContainerName(sid, ctr.Name)
 	e.logger.Info("rules applied",
 		"container", ctr.Name,
 		"rule_sets", len(ruleSets),
@@ -681,9 +707,10 @@ func (e *Engine) removeChains(containerID string, source audit.Source) error {
 			e.logger.Warn("ip6tables cleanup failed (best-effort)", "containerID", containerID, "error", err)
 		}
 	}
+	_, tracked := e.applied[containerID]
 	delete(e.applied, containerID)
 	e.dropContainerIPs(containerID)
-	if e.auditLog != nil {
+	if tracked && e.auditLog != nil {
 		e.auditLog.RulesRemoved(containerID, source)
 	}
 	return nil

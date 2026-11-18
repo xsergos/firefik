@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
@@ -20,6 +21,9 @@ import AddAgentPage from "@/pages/AddAgentPage";
 import AgentTokensPage from "@/pages/AgentTokensPage";
 import LoginPage from "@/pages/LoginPage";
 import { AuthGate } from "@/components/AuthGate";
+import { TableLoading } from "@/components/shared/TableStates";
+
+const HelpPage = lazy(() => import("@/pages/help/HelpPage"));
 
 export default function App() {
   return (
@@ -130,6 +134,26 @@ export default function App() {
                   element={
                     <ErrorBoundary>
                       <AgentDetailPage />
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="help"
+                  element={
+                    <ErrorBoundary>
+                      <Suspense fallback={<TableLoading label="Loading help…" />}>
+                        <HelpPage />
+                      </Suspense>
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="help/:section"
+                  element={
+                    <ErrorBoundary>
+                      <Suspense fallback={<TableLoading label="Loading help…" />}>
+                        <HelpPage />
+                      </Suspense>
                     </ErrorBoundary>
                   }
                 />

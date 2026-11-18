@@ -99,14 +99,32 @@ func TestBuildNflogRule(t *testing.T) {
 	}
 
 	custom := buildNflogRule("tcp", "22", "", "MyPrefix*&^", "DROP")
-	if got := flagValue(custom, "--nflog-prefix"); got != "MyPrefix" {
+	if got := flagValue(custom, "--nflog-prefix"); got != "FIREFIK DROP MyPrefix" {
 		t.Errorf("sanitized prefix: got %q", got)
+	}
+
+	accept := buildNflogRule("tcp", "443", "", "web", "ACCEPT")
+	if got := flagValue(accept, "--nflog-prefix"); got != "FIREFIK ACCEPT web" {
+		t.Errorf("rule label prefix: got %q", got)
 	}
 
 	veryLong := strings.Repeat("a", 200)
 	cut := buildNflogRule("tcp", "22", "", veryLong, "DROP")
 	if got := flagValue(cut, "--nflog-prefix"); len(got) > LogPrefixMaxLen {
 		t.Errorf("expected truncation to %d, got %d", LogPrefixMaxLen, len(got))
+	}
+}
+
+func TestDefaultDropNflogArgs(t *testing.T) {
+	args := defaultDropNflogArgs(10, DefaultPolicyLogLabel)
+	if flagValue(args, "--limit") != "10/second" || flagValue(args, "--limit-burst") != "10" {
+		t.Errorf("limit flags: %v", args)
+	}
+	if flagValue(args, "-j") != "NFLOG" {
+		t.Errorf("target: %v", args)
+	}
+	if got := flagValue(args, "--nflog-prefix"); got != "FIREFIK DROP default" {
+		t.Errorf("prefix: got %q", got)
 	}
 }
 

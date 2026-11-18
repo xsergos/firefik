@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -37,6 +38,10 @@ func (s *HTTPServer) handleTemplates(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		s.recordChange(r, "template_published", "", map[string]string{
+			"template": out.Name,
+			"version":  strconv.FormatInt(out.Version, 10),
+		})
 		writeJSON(w, http.StatusOK, out)
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

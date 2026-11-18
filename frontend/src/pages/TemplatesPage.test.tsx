@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +16,35 @@ vi.mock("@/lib/controlPlaneApi", () => ({
   publishTemplate: vi.fn(),
 }));
 
+vi.mock("@/lib/api", () => ({
+  validatePolicy: vi.fn(),
+}));
+
+vi.mock("./PolicyEditor", () => ({
+  default: ({
+    value,
+    onChange,
+    className,
+    id,
+    placeholder,
+  }: {
+    value: string;
+    onChange: (v: string) => void;
+    className?: string;
+    id?: string;
+    placeholder?: string;
+  }) => (
+    <textarea
+      data-testid="template-editor"
+      id={id}
+      placeholder={placeholder}
+      className={className}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  ),
+}));
+
 function renderPage() {
   const qc = new QueryClient({
     defaultOptions: {
@@ -26,7 +56,9 @@ function renderPage() {
     qc,
     ...render(
       <QueryClientProvider client={qc}>
-        <TemplatesPage />
+        <MemoryRouter>
+          <TemplatesPage />
+        </MemoryRouter>
       </QueryClientProvider>,
     ),
   };
@@ -56,6 +88,8 @@ beforeEach(async () => {
   const api = await import("@/lib/controlPlaneApi");
   vi.mocked(api.fetchTemplates).mockResolvedValue([tplA, tplB]);
   vi.mocked(api.publishTemplate).mockResolvedValue(tplA);
+  const core = await import("@/lib/api");
+  vi.mocked(core.validatePolicy).mockResolvedValue({ ok: true });
 });
 
 afterEach(() => {
@@ -69,6 +103,13 @@ describe("TemplatesPage", () => {
     expect(screen.getByText("db-deny")).toBeInTheDocument();
     expect(screen.getByText("alice")).toBeInTheDocument();
     expect(screen.getByText("tier=edge")).toBeInTheDocument();
+  });
+
+  it("has a Templates heading and labelled inputs", async () => {
+    renderPage();
+    expect(screen.getByRole("heading", { level: 1, name: "Templates" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toHaveAttribute("id", "template-name");
+    expect(await screen.findByLabelText(/Rules/)).toHaveAttribute("id", "template-body");
   });
 
   it("shows the empty state when API returns []", async () => {
@@ -115,7 +156,7 @@ describe("TemplatesPage", () => {
     await user.type(screen.getByPlaceholderText("template-name"), "new-tpl");
     expect(publishBtn).toBeDisabled();
 
-    await user.type(screen.getByPlaceholderText(/policy DSL body/i), "policy body content");
+    await user.type(await screen.findByTestId("template-editor"), "policy body content");
     expect(publishBtn).toBeEnabled();
   });
 
@@ -129,7 +170,7 @@ describe("TemplatesPage", () => {
     await waitFor(() => expect(screen.getByText("web-allow")).toBeInTheDocument());
 
     await user.type(screen.getByPlaceholderText("template-name"), "new-tpl");
-    await user.type(screen.getByPlaceholderText(/policy DSL body/i), "policy body content");
+    await user.type(await screen.findByTestId("template-editor"), "policy body content");
     await user.click(screen.getByRole("button", { name: /^Publish$/ }));
 
     await waitFor(() =>
@@ -151,9 +192,38 @@ describe("TemplatesPage", () => {
     await waitFor(() => expect(screen.getByText("web-allow")).toBeInTheDocument());
 
     await user.type(screen.getByPlaceholderText("template-name"), "new-tpl");
-    await user.type(screen.getByPlaceholderText(/policy DSL body/i), "policy body content");
+    await user.type(await screen.findByTestId("template-editor"), "policy body content");
     await user.click(screen.getByRole("button", { name: /^Publish$/ }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith("forbidden"));
+  });
+});
+
+describe("TemplatesPage editor", () => {
+  it("uses the policy editor and checks the text with the policy validator", async () => {
+    const user = userEvent.setup();
+    const core = await import("@/lib/api");
+    renderPage();
+    const editor = await screen.findByTestId("template-editor");
+    await user.type(editor, "policy body content");
+    await waitFor(() => expect(core.validatePolicy).toHaveBeenCalledWith("policy body content"));
+    expect(await screen.findByText(/Syntax OK/i)).toBeInTheDocument();
+  });
+
+  it("shows validation errors inline and blocks Publish until they are fixed", async () => {
+    const user = userEvent.setup();
+    const core = await import("@/lib/api");
+    const api = await import("@/lib/controlPlaneApi");
+    vi.mocked(core.validatePolicy).mockResolvedValue({ ok: false, errors: ["unexpected token"] });
+    renderPage();
+    await waitFor(() => expect(screen.getByText("web-allow")).toBeInTheDocument());
+
+    await user.type(screen.getByPlaceholderText("template-name"), "new-tpl");
+    await user.type(await screen.findByTestId("template-editor"), "policy broken");
+    expect(await screen.findByText(/unexpected token/)).toBeInTheDocument();
+    const publishBtn = screen.getByRole("button", { name: /^Publish$/ });
+    expect(publishBtn).toBeDisabled();
+    await user.click(publishBtn);
+    expect(api.publishTemplate).not.toHaveBeenCalled();
   });
 });

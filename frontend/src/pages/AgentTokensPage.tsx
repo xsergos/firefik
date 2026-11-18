@@ -1,15 +1,22 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import {
   createAgentToken,
+  fetchAgents,
   fetchAgentTokens,
   revokeAgentToken,
   type AgentTokenIssued,
   type AgentTokenRecord,
 } from "@/lib/fleetApi";
+import { queryKeys } from "@/lib/queryKeys";
+import { formatActor } from "@/lib/actor";
+import { formatRelative } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { AgentStatusBadge } from "@/components/shared/AgentStatusBadge";
 import {
   Table,
   TableBody,
@@ -22,18 +29,29 @@ import { TableLoading, TableError } from "@/components/shared/TableStates";
 
 const AGENT_TOKENS_KEY = ["agent-tokens"] as const;
 
+const LAST_CONNECTED_HINT =
+  "When an agent last connected with this token: when it starts or reconnects, or answers a command from the panel. Regular check-ins do not change it, so see the Agent column for whether the agent is online.";
+
 export default function AgentTokensPage() {
   const qc = useQueryClient();
   const [includeRevoked, setIncludeRevoked] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [issuedSecret, setIssuedSecret] = useState<AgentTokenIssued | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<AgentTokenRecord | null>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [...AGENT_TOKENS_KEY, includeRevoked] as const,
     queryFn: () => fetchAgentTokens(includeRevoked),
     refetchInterval: 30_000,
   });
+
+  const agentsQuery = useQuery({
+    queryKey: queryKeys.agents(),
+    queryFn: fetchAgents,
+    refetchInterval: 30_000,
+  });
+  const agentByID = new Map((agentsQuery.data ?? []).map((a) => [a.instance_id, a]));
 
   const create = useMutation({
     mutationFn: () => createAgentToken(name.trim(), description.trim() || undefined),
@@ -51,6 +69,7 @@ export default function AgentTokensPage() {
     mutationFn: (id: string) => revokeAgentToken(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: AGENT_TOKENS_KEY });
+      setRevokeTarget(null);
       toast.success("Token revoked");
     },
     onError: (e: Error) => toast.error(`Revoke failed: ${e.message}`),
@@ -70,9 +89,13 @@ export default function AgentTokensPage() {
       <div>
         <h1 className="text-2xl font-bold">Agent tokens</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Long-lived bearer tokens that agents present on the gRPC stream. Plaintext is shown{" "}
-          <strong>once</strong> at creation — copy it immediately. Revoke individual tokens here
-          when a host is decommissioned or rotated.
+          Most hosts should be added with{" "}
+          <Link to="/fleet/add" className="underline">
+            Fleet → Add agent
+          </Link>
+          . Long-lived tokens are only for hosts that cannot use one-time enrollment. A new token is
+          shown <strong>once</strong>, so copy it right away, and revoke it here when the host is
+          retired.
         </p>
       </div>
 
@@ -130,7 +153,7 @@ export default function AgentTokensPage() {
 
       <section className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Active tokens</h2>
+          <h2 className="text-lg font-semibold">Tokens</h2>
           <label className="text-xs text-muted-foreground flex items-center gap-2">
             <input
               type="checkbox"
@@ -147,7 +170,11 @@ export default function AgentTokensPage() {
           <TableError label="Could not load agent tokens." />
         ) : tokens.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No agent tokens issued yet. Create one above to enroll a new agent.
+            No agent tokens issued yet. Most hosts do not need one: add them with{" "}
+            <Link to="/fleet/add" className="underline">
+              Add agent
+            </Link>
+            .
           </p>
         ) : (
           <Table>
@@ -155,8 +182,9 @@ export default function AgentTokensPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Agent</TableHead>
                 <TableHead>Issued</TableHead>
-                <TableHead>Last seen</TableHead>
+                <TableHead title={LAST_CONNECTED_HINT}>Last connected</TableHead>
                 <TableHead>Issued by</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -164,6 +192,8 @@ export default function AgentTokensPage() {
             <TableBody>
               {tokens.map((t: AgentTokenRecord) => {
                 const revoked = !!t.revoked_at;
+                const agent = agentByID.get(t.name);
+                const issuedBy = formatActor(t.issued_by);
                 return (
                   <TableRow key={t.id}>
                     <TableCell className="font-mono">
@@ -179,30 +209,44 @@ export default function AgentTokensPage() {
                         <Badge variant="default">active</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs">
-                      {new Date(t.issued_at).toLocaleString()}
+                    <TableCell>
+                      {agent ? (
+                        <Link
+                          to={`/fleet/${encodeURIComponent(agent.instance_id)}`}
+                          className="inline-flex items-center gap-2 underline"
+                          aria-label={`Open agent ${agent.instance_id}`}
+                        >
+                          <AgentStatusBadge status={agent.status} />
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">no agent</span>
+                      )}
                     </TableCell>
-                    <TableCell className="text-xs">
+                    <TableCell className="text-xs" title={new Date(t.issued_at).toLocaleString()}>
+                      {formatRelative(t.issued_at)}
+                    </TableCell>
+                    <TableCell
+                      className="text-xs"
+                      title={
+                        t.last_used_at
+                          ? `${new Date(t.last_used_at).toLocaleString()}. ${LAST_CONNECTED_HINT}`
+                          : LAST_CONNECTED_HINT
+                      }
+                    >
                       {t.last_used_at
-                        ? `${new Date(t.last_used_at).toLocaleString()}${t.last_used_ip ? ` · ${t.last_used_ip}` : ""}`
+                        ? `${formatRelative(t.last_used_at)}${t.last_used_ip ? ` · ${t.last_used_ip}` : ""}`
                         : "—"}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{t.issued_by}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground" title={issuedBy.title}>
+                      {issuedBy.label}
+                    </TableCell>
                     <TableCell className="text-right">
                       {!revoked && (
                         <Button
                           size="sm"
                           variant="destructive"
                           disabled={revoke.isPending}
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Revoke token "${t.name}"? Agents using it will fail authentication.`,
-                              )
-                            ) {
-                              revoke.mutate(t.id);
-                            }
-                          }}
+                          onClick={() => setRevokeTarget(t)}
                         >
                           Revoke
                         </Button>
@@ -215,6 +259,18 @@ export default function AgentTokensPage() {
           </Table>
         )}
       </section>
+
+      <ConfirmDialog
+        open={revokeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRevokeTarget(null);
+        }}
+        title={`Revoke token "${revokeTarget?.name ?? ""}"?`}
+        description="Agents using this token fail authentication on their next reconnect. This cannot be undone; issue a new token to re-enroll the host."
+        confirmLabel="Revoke token"
+        pending={revoke.isPending}
+        onConfirm={() => revokeTarget && revoke.mutate(revokeTarget.id)}
+      />
     </div>
   );
 }

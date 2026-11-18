@@ -142,8 +142,19 @@ func TestNflogExpr(t *testing.T) {
 	}
 
 	custom := nflogExpr("MyPrefix", "ACCEPT")
-	if string(custom.Data) != "MyPrefix" {
+	if string(custom.Data) != "FIREFIK ACCEPT MyPrefix" {
 		t.Errorf("custom: got %q", custom.Data)
+	}
+
+	exprs := defaultDropLogExprs(10, DefaultPolicyLogLabel)
+	if len(exprs) != 2 {
+		t.Fatalf("expected limit + log, got %d", len(exprs))
+	}
+	if lim, ok := exprs[0].(*expr.Limit); !ok || lim.Rate != 10 || lim.Unit != expr.LimitTimeSecond {
+		t.Errorf("limit expr: %+v", exprs[0])
+	}
+	if lg, ok := exprs[1].(*expr.Log); !ok || string(lg.Data) != "FIREFIK DROP default" {
+		t.Errorf("log expr: %+v", exprs[1])
 	}
 
 	long := nflogExpr(strings.Repeat("a", 200), "DROP")

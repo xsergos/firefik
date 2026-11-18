@@ -10,6 +10,9 @@ import {
   useApplyContainer,
   useBulkContainers,
   useDeactivateContainer,
+  unconfirmedToastMessage,
+  usePendingFirewall,
+  type PendingTarget,
 } from "./useContainerMutations";
 
 vi.mock("@/lib/api", async () => {
@@ -68,7 +71,7 @@ describe("useApplyContainer", () => {
     for (const expected of invalidateAfterMutation) {
       expect(invalidatedKeys).toContainEqual(expected);
     }
-    expect(toast.success).toHaveBeenCalledWith("Firewall rules applied");
+    expect(toast.success).toHaveBeenCalledWith("Rules applied to abc123");
   });
 
   it("surfaces userMessage via toast when APIError is thrown", async () => {
@@ -102,7 +105,7 @@ describe("useApplyContainer", () => {
 });
 
 describe("useDeactivateContainer", () => {
-  it("invalidates keys and shows deactivation toast", async () => {
+  it("invalidates keys and shows the turn off toast", async () => {
     const api = await loadApi();
     vi.mocked(api.deactivateContainerRules).mockResolvedValue(undefined);
     const { spy, Wrapper } = makeWrapper();
@@ -113,7 +116,7 @@ describe("useDeactivateContainer", () => {
     });
 
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(invalidateAfterMutation.length));
-    expect(toast.success).toHaveBeenCalledWith("Firewall rules deactivated");
+    expect(toast.success).toHaveBeenCalledWith("Firewall turned off for abc123");
   });
 
   it("surfaces APIError details on deactivation failure", async () => {
@@ -150,7 +153,9 @@ describe("useBulkContainers", () => {
     });
 
     await waitFor(() => expect(spy).toHaveBeenCalledTimes(invalidateAfterMutation.length));
-    expect(toast.success).toHaveBeenCalledWith("Bulk: 2 applied, 1 disabled");
+    expect(toast.success).toHaveBeenCalledWith(
+      "Bulk: applied 2 containers and turned off 1 container",
+    );
   });
 
   it("emits a warning toast when some actions failed (mixed result)", async () => {
@@ -200,5 +205,149 @@ describe("useBulkContainers", () => {
     });
 
     expect(toast.error).toHaveBeenCalledWith("Bulk update failed.");
+  });
+});
+
+describe("agent-aware toasts", () => {
+  it("says the apply was sent to the agent instead of claiming it is done", async () => {
+    const api = await loadApi();
+    vi.mocked(api.applyContainerRules).mockResolvedValue(undefined);
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useApplyContainer(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ id: "abc", agent_id: "local-01", name: "web" });
+    });
+    expect(toast.success).toHaveBeenCalledWith("Sent to local-01: applying rules to web…");
+  });
+
+  it("says the turn off was sent to the agent", async () => {
+    const api = await loadApi();
+    vi.mocked(api.deactivateContainerRules).mockResolvedValue(undefined);
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useDeactivateContainer(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ id: "abc", agent_id: "local-01", name: "web" });
+    });
+    expect(toast.success).toHaveBeenCalledWith(
+      "Sent to local-01: turning off the firewall for web…",
+    );
+  });
+
+  it("summarises bulk actions sent to one agent", async () => {
+    const api = await loadApi();
+    vi.mocked(api.bulkContainerActions).mockResolvedValue({
+      summary: { total: 1, applied: 1, disabled: 0, failed: 0 },
+      results: [],
+    });
+    const { Wrapper } = makeWrapper();
+    const { result } = renderHook(() => useBulkContainers(), { wrapper: Wrapper });
+    await act(async () => {
+      await result.current.mutateAsync([{ id: "a", action: "apply", agent_id: "local-01" }]);
+    });
+    expect(toast.success).toHaveBeenCalledWith("Sent to local-01: applying rules to 1 container…");
+  });
+});
+
+describe("usePendingFirewall", () => {
+  const target =
+    (status: string) =>
+    (id: string): PendingTarget => ({ status, name: `ctr-${id}`, agentID: "local-01" });
+
+  it("stays pending until a refresh shows the expected state", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const { result, rerender } = renderHook(({ at }) => usePendingFirewall(at, target("active")), {
+      initialProps: { at: 500 },
+    });
+    act(() => result.current.mark(["c1"], "off"));
+    expect(result.current.pendingFor("c1", "active")).toBe("off");
+    rerender({ at: 2_000 });
+    expect(result.current.pendingFor("c1", "active")).toBe("off");
+    expect(result.current.pendingFor("c1", "disabled")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("keeps a re-apply pending until data newer than the request arrives", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const { result, rerender } = renderHook(({ at }) => usePendingFirewall(at, target("active")), {
+      initialProps: { at: 500 },
+    });
+    act(() => result.current.mark(["c1"], "apply"));
+    expect(result.current.pendingFor("c1", "active")).toBe("apply");
+    rerender({ at: 1_500 });
+    expect(result.current.pendingFor("c1", "active")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("can be cleared on error", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => usePendingFirewall(0, target("disabled")));
+    act(() => result.current.mark(["c1", "c2"], "apply"));
+    act(() => result.current.clear(["c2"]));
+    expect(result.current.pendingFor("c2", "disabled")).toBeNull();
+    expect(result.current.pendingFor("c1", "disabled")).toBe("apply");
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(toast.warning).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("warns and keeps a not confirmed marker when the agent never reports the new state", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const { result } = renderHook(() => usePendingFirewall(2_000, target("active")));
+    act(() => result.current.mark(["c1"], "off"));
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(toast.warning).toHaveBeenCalledWith(
+      "local-01 has not confirmed that the firewall is off for ctr-c1 yet",
+      expect.anything(),
+    );
+    expect(result.current.pendingFor("c1", "active")).toBe("unconfirmed");
+    expect(result.current.pendingFor("c1", "disabled")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("clears silently when the target state was reached before the timeout", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+    const { result, rerender } = renderHook(
+      ({ at, status }) => usePendingFirewall(at, target(status)),
+      { initialProps: { at: 500, status: "inactive" } },
+    );
+    act(() => result.current.mark(["c1"], "apply"));
+    rerender({ at: 5_000, status: "active" });
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(result.current.pendingFor("c1", "inactive")).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it("forgets containers that disappeared without a warning", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => usePendingFirewall(0, () => undefined));
+    act(() => result.current.mark(["c1"], "apply"));
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(result.current.pendingFor("c1", "disabled")).toBeNull();
+    vi.useRealTimers();
+  });
+});
+
+describe("unconfirmedToastMessage", () => {
+  it("names the agent, the action and the container", () => {
+    expect(unconfirmedToastMessage("apply", "web", "local-01")).toBe(
+      "local-01 has not confirmed that rules are applied to web yet",
+    );
+    expect(unconfirmedToastMessage("off", "web")).toBe(
+      "Firefik has not confirmed that the firewall is off for web yet",
+    );
   });
 });

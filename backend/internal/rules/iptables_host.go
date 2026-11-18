@@ -47,7 +47,7 @@ func (b *IPTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		proto := rule.protoNormalised()
 		for _, peer := range rule.Blocklist {
 			if rule.Log {
-				if err := b.appendHostNflog(proto, rule.Ports, peer, rule.LogPrefix, "DROP"); err != nil {
+				if err := b.appendHostNflog(proto, rule.Ports, peer, hostLogLabel(rule.LogPrefix, rule.Name), "DROP"); err != nil {
 					return fmt.Errorf("host rule %q blocklist log %s: %w", rule.Name, peer.String(), err)
 				}
 			}
@@ -57,7 +57,7 @@ func (b *IPTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		}
 		for _, peer := range rule.Allowlist {
 			if rule.Log {
-				if err := b.appendHostNflog(proto, rule.Ports, peer, rule.LogPrefix, "ACCEPT"); err != nil {
+				if err := b.appendHostNflog(proto, rule.Ports, peer, hostLogLabel(rule.LogPrefix, rule.Name), "ACCEPT"); err != nil {
 					return fmt.Errorf("host rule %q allowlist log %s: %w", rule.Name, peer.String(), err)
 				}
 			}
@@ -67,7 +67,7 @@ func (b *IPTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		}
 		if len(rule.Allowlist) == 0 && len(rule.Blocklist) == 0 {
 			if rule.Log {
-				if err := b.appendHostNflog(proto, rule.Ports, net.IPNet{}, rule.LogPrefix, "ACCEPT"); err != nil {
+				if err := b.appendHostNflog(proto, rule.Ports, net.IPNet{}, hostLogLabel(rule.LogPrefix, rule.Name), "ACCEPT"); err != nil {
 					return fmt.Errorf("host rule %q bare allow log: %w", rule.Name, err)
 				}
 			}
@@ -78,6 +78,11 @@ func (b *IPTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 	}
 
 	target := NormaliseHostDefault(defaultPolicy)
+	if b.defaultDropLog > 0 && target == "DROP" {
+		if err := b.ipt.Append(filterTable, hostChainName, defaultDropNflogArgs(b.defaultDropLog, HostLogLabelPrefix+" "+DefaultPolicyLogLabel)...); err != nil {
+			return fmt.Errorf("append host default policy log: %w", err)
+		}
+	}
 	if err := b.ipt.Append(filterTable, hostChainName, "-j", target); err != nil {
 		return fmt.Errorf("append default policy %s: %w", target, err)
 	}
@@ -106,14 +111,8 @@ func (b *IPTablesBackend) appendHostRule(proto string, ports []uint16, peer net.
 	return b.ipt.Append(filterTable, hostChainName, args...)
 }
 
-func (b *IPTablesBackend) appendHostNflog(proto string, ports []uint16, peer net.IPNet, logPrefix, actionType string) error {
-	prefix := strings.TrimSpace(logPrefix)
-	if prefix == "" {
-		prefix = "firefik-host-" + actionType
-	}
-	if len(prefix) > LogPrefixMaxLen {
-		prefix = prefix[:LogPrefixMaxLen]
-	}
+func (b *IPTablesBackend) appendHostNflog(proto string, ports []uint16, peer net.IPNet, label, actionType string) error {
+	prefix := NflogPrefix(actionType, label)
 	args := make([]string, 0, 14)
 	if peer.IP != nil {
 		args = append(args, "-s", peer.String())

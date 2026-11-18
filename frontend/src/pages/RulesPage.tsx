@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { fetchRules } from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import type { RuleEntry, FirewallRuleSetDTO } from "@/types/api";
@@ -14,6 +15,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TableLoading, TableError } from "@/components/shared/TableStates";
+import { UnlistedPortsBadge } from "@/components/shared/FirewallBadge";
+import { UNLISTED_PORTS_HINT, containerHref } from "@/lib/firewallState";
 
 const HOST_CONTAINER_ID = "(host)";
 const HOST_STATUS = "host";
@@ -28,12 +31,38 @@ function agentKey(entry: RuleEntry): string {
 }
 
 function agentLabel(entry: RuleEntry): string {
-  return entry.agent_hostname || entry.agent_id || "local agent";
+  return entry.agent_id || entry.agent_hostname || "local agent";
+}
+
+function agentHint(entry: RuleEntry): string | undefined {
+  if (!entry.agent_hostname || entry.agent_hostname === entry.agent_id) return undefined;
+  return `Host: ${entry.agent_hostname}`;
+}
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+function groupSummary(group: AgentGroup): string {
+  const containers = plural(group.containerEntries.length, "container", "containers");
+  return group.hostEntries.length > 0 ? `Host firewall · ${containers}` : containers;
+}
+
+function hasFlags(rs: FirewallRuleSetDTO): boolean {
+  return !!(rs.log || rs.rateLimit || rs.geoBlock?.length || rs.geoAllow?.length);
+}
+
+function containerLink(entry: RuleEntry): string {
+  return containerHref(
+    entry.agent_id || entry.agent_hostname,
+    entry.containerName || entry.containerID,
+  );
 }
 
 type AgentGroup = {
   key: string;
   label: string;
+  hint?: string;
   agentID?: string;
   hostEntries: RuleEntry[];
   containerEntries: RuleEntry[];
@@ -48,6 +77,7 @@ function groupByAgent(entries: RuleEntry[]): AgentGroup[] {
       group = {
         key,
         label: agentLabel(entry),
+        hint: agentHint(entry),
         agentID: entry.agent_id,
         hostEntries: [],
         containerEntries: [],
@@ -142,7 +172,12 @@ export default function RulesPage() {
   return (
     <div className="space-y-6" aria-busy={isFetching}>
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl font-semibold">Active Rules</h1>
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold">Rules</h1>
+          <p className="text-sm text-muted-foreground">
+            The firewall rules each agent enforces right now, for the host and for its containers.
+          </p>
+        </div>
         <RuleFilters
           filters={filters}
           onChange={setFilters}
@@ -237,14 +272,21 @@ function AgentGroupCard({ group, filterActive }: { group: AgentGroup; filterActi
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-3 text-base">
-          <span className="font-mono">{group.label}</span>
-          {group.agentID && group.agentID !== group.label && (
-            <Badge variant="outline" className="text-xs font-normal">
-              {group.agentID}
-            </Badge>
+          {group.agentID ? (
+            <Link
+              to={`/fleet/${encodeURIComponent(group.agentID)}`}
+              className="font-mono underline"
+              title={group.hint}
+            >
+              {group.label}
+            </Link>
+          ) : (
+            <span className="font-mono" title={group.hint}>
+              {group.label}
+            </span>
           )}
           <Badge variant="secondary" className="text-xs font-normal ml-auto">
-            {group.hostEntries.length} host · {group.containerEntries.length} container
+            {groupSummary(group)}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -298,18 +340,34 @@ function AgentSection({
 }
 
 function EntryBlock({ entry, isHost }: { entry: RuleEntry; isHost: boolean }) {
+  const showFlags = entry.ruleSets.some(hasFlags);
+  const title = entry.containerName || entry.containerID;
   return (
     <div className="border rounded-md p-3 space-y-2">
       <div className="flex items-center gap-3 flex-wrap text-sm">
-        <span className="font-mono font-medium">{entry.containerName || entry.containerID}</span>
+        {isHost ? (
+          <span className="font-mono font-medium">{title}</span>
+        ) : (
+          <Link
+            to={containerLink(entry)}
+            className="font-mono font-medium underline"
+            title="Open on the Containers page"
+          >
+            {title}
+          </Link>
+        )}
         {!isHost && (
           <Badge variant="outline" className="text-xs font-normal">
             {entry.containerID}
           </Badge>
         )}
-        <Badge variant={entry.defaultPolicy === "DROP" ? "destructive" : "secondary"}>
-          {entry.defaultPolicy}
-        </Badge>
+        <span
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+          title={UNLISTED_PORTS_HINT}
+        >
+          Unlisted ports
+          <UnlistedPortsBadge policy={entry.defaultPolicy} />
+        </span>
         {entry.status && (
           <Badge
             variant={entry.status === "running" ? "default" : "secondary"}
@@ -331,12 +389,12 @@ function EntryBlock({ entry, isHost }: { entry: RuleEntry; isHost: boolean }) {
               <TableHead>Allowlist</TableHead>
               <TableHead>Blocklist</TableHead>
               <TableHead>Profile</TableHead>
-              <TableHead>Flags</TableHead>
+              {showFlags && <TableHead>Flags</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {entry.ruleSets.map((rs) => (
-              <RuleSetRow key={rs.name} rs={rs} />
+              <RuleSetRow key={rs.name} rs={rs} showFlags={showFlags} />
             ))}
           </TableBody>
         </Table>
@@ -345,7 +403,7 @@ function EntryBlock({ entry, isHost }: { entry: RuleEntry; isHost: boolean }) {
   );
 }
 
-function RuleSetRow({ rs }: { rs: FirewallRuleSetDTO }) {
+function RuleSetRow({ rs, showFlags }: { rs: FirewallRuleSetDTO; showFlags: boolean }) {
   return (
     <TableRow>
       <TableCell className="font-medium">{rs.name}</TableCell>
@@ -366,16 +424,18 @@ function RuleSetRow({ rs }: { rs: FirewallRuleSetDTO }) {
         <CIDRList items={rs.blocklist} variant="destructive" />
       </TableCell>
       <TableCell>{rs.profile ? <Badge variant="secondary">{rs.profile}</Badge> : "—"}</TableCell>
-      <TableCell className="space-x-1">
-        {rs.log && <Badge variant="outline">log</Badge>}
-        {rs.rateLimit && <Badge variant="outline">{rs.rateLimit.rate}/s</Badge>}
-        {rs.geoBlock && rs.geoBlock.length > 0 && (
-          <Badge variant="destructive">block:{rs.geoBlock.join(",")}</Badge>
-        )}
-        {rs.geoAllow && rs.geoAllow.length > 0 && (
-          <Badge variant="default">allow:{rs.geoAllow.join(",")}</Badge>
-        )}
-      </TableCell>
+      {showFlags && (
+        <TableCell className="space-x-1">
+          {rs.log && <Badge variant="outline">log</Badge>}
+          {rs.rateLimit && <Badge variant="outline">{rs.rateLimit.rate}/s</Badge>}
+          {rs.geoBlock && rs.geoBlock.length > 0 && (
+            <Badge variant="destructive">block:{rs.geoBlock.join(",")}</Badge>
+          )}
+          {rs.geoAllow && rs.geoAllow.length > 0 && (
+            <Badge variant="default">allow:{rs.geoAllow.join(",")}</Badge>
+          )}
+        </TableCell>
+      )}
     </TableRow>
   );
 }

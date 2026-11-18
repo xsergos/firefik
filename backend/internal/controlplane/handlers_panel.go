@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"sort"
@@ -382,6 +383,7 @@ type auditEventDTO struct {
 	AgentHostname string            `json:"agent_hostname,omitempty"`
 	Action        string            `json:"action"`
 	Source        string            `json:"source"`
+	Actor         string            `json:"actor,omitempty"`
 	ContainerID   string            `json:"container_id,omitempty"`
 	ContainerName string            `json:"container_name,omitempty"`
 	Metadata      map[string]string `json:"metadata,omitempty"`
@@ -428,9 +430,13 @@ func (s *HTTPServer) handleFleetAuditHistory(w http.ResponseWriter, r *http.Requ
 			if v, ok := ev.Payload["source"].(string); ok && v != "" {
 				dto.Source = v
 			}
+			if v, ok := ev.Payload["actor"].(string); ok {
+				dto.Actor = v
+			}
 			meta := map[string]string{}
 			for k, v := range ev.Payload {
-				if k == "container_id" || k == "container_name" || k == "source" || k == "action" {
+				switch k {
+				case "container_id", "container_name", "source", "action", "actor", "agent_id", "ts":
 					continue
 				}
 				if s, ok := v.(string); ok {
@@ -494,9 +500,12 @@ type policySaveRequest struct {
 
 type policySimulateRequest struct {
 	ContainerID string            `json:"containerID,omitempty"`
+	AgentID     string            `json:"agentID,omitempty"`
 	DSL         string            `json:"dsl,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
 }
+
+const containerPolicyLabel = "firefik.policy"
 
 type policySimulateResponse struct {
 	Policy        string            `json:"policy"`
@@ -566,6 +575,8 @@ func (s *HTTPServer) handlePolicy(w http.ResponseWriter, r *http.Request) {
 		s.handlePolicyGet(w, r, name)
 	case sub == "" && r.Method == http.MethodPut:
 		s.handlePolicySave(w, r, name)
+	case sub == "versions" && r.Method == http.MethodGet:
+		s.handlePolicyVersions(w, r, name)
 	default:
 		http.Error(w, "method or subresource not allowed", http.StatusMethodNotAllowed)
 	}
@@ -585,6 +596,37 @@ func (s *HTTPServer) handlePolicyGet(w http.ResponseWriter, r *http.Request, nam
 	})
 }
 
+type policyVersionDTO struct {
+	Version     string    `json:"version"`
+	SHA         string    `json:"sha"`
+	DSL         string    `json:"dsl"`
+	Author      string    `json:"author,omitempty"`
+	Comment     string    `json:"comment,omitempty"`
+	CommittedAt time.Time `json:"committedAt"`
+}
+
+const maxPolicyVersions = 50
+
+func (s *HTTPServer) handlePolicyVersions(w http.ResponseWriter, r *http.Request, name string) {
+	versions, err := s.Registry.store.ListPolicyVersions(r.Context(), name, maxPolicyVersions)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	out := make([]policyVersionDTO, 0, len(versions))
+	for _, v := range versions {
+		if v.Name != name {
+			continue
+		}
+		out = append(out, policyVersionDTO{
+			Version: shortSHA(v.SHA), SHA: v.SHA, DSL: v.DSL,
+			Author: v.Author, Comment: v.Comment, CommittedAt: v.CommittedAt,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CommittedAt.After(out[j].CommittedAt) })
+	writeJSON(w, http.StatusOK, out)
+}
+
 func (s *HTTPServer) handlePolicySave(w http.ResponseWriter, r *http.Request, name string) {
 	var req policySaveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -601,12 +643,27 @@ func (s *HTTPServer) handlePolicySave(w http.ResponseWriter, r *http.Request, na
 	}
 	author := req.Author
 	if author == "" {
-		author = "panel"
+		author = s.attribute(r)
 	}
+	previous, prevErr := s.Registry.store.GetPolicyVersion(r.Context(), name)
 	v, err := s.Registry.store.SetPolicyVersion(r.Context(), name, req.DSL, author, req.Comment)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	changeFields := map[string]string{
+		"policy_name": name,
+		"version":     shortSHA(v.SHA),
+		"sha":         v.SHA,
+		"comment":     req.Comment,
+		"rules":       strconv.Itoa(countRulesInDSL(v.DSL)),
+	}
+	if prevErr == nil && previous.SHA != "" {
+		changeFields["previous_version"] = shortSHA(previous.SHA)
+		changeFields["previous_sha"] = previous.SHA
+	}
+	if prevErr != nil || previous.SHA != v.SHA {
+		s.recordChange(r, "policy_saved", "", changeFields)
 	}
 	writeJSON(w, http.StatusOK, policySummaryDTO{
 		Name:        v.Name,
@@ -673,7 +730,65 @@ func (s *HTTPServer) handlePolicySimulate(w http.ResponseWriter, r *http.Request
 	resp.RuleSets = views
 	resp.Warnings = warns
 	resp.DefaultPolicy = "DROP"
+	if req.ContainerID != "" {
+		if ctr, ok := s.findSnapshotContainer(r.Context(), req.AgentID, req.ContainerID); ok {
+			resp.Container = ctr.ID
+			if resp.LabelsSeen == nil && len(ctr.Labels) > 0 {
+				resp.LabelsSeen = ctr.Labels
+			}
+			if ctr.DefaultPolicy != "" {
+				resp.DefaultPolicy = ctr.DefaultPolicy
+			}
+			if !labelListsPolicy(ctr.Labels[containerPolicyLabel], name) {
+				label := ctr.Name
+				if label == "" {
+					label = ctr.ID
+				}
+				resp.Warnings = append(resp.Warnings, fmt.Sprintf(
+					"container %s has no label %s=%s, so this policy does not apply to it",
+					label, containerPolicyLabel, name))
+			}
+		} else {
+			resp.Warnings = append(resp.Warnings, "container "+req.ContainerID+" was not found in the latest agent reports")
+		}
+	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *HTTPServer) findSnapshotContainer(ctx context.Context, agentID, containerID string) (ContainerState, bool) {
+	agents := []string{}
+	if agentID != "" {
+		agents = append(agents, agentID)
+	} else {
+		records, err := s.Registry.store.ListAgents(ctx)
+		if err != nil {
+			return ContainerState{}, false
+		}
+		for _, rec := range records {
+			agents = append(agents, rec.Identity.InstanceID)
+		}
+	}
+	for _, id := range agents {
+		snap, err := s.Registry.store.LatestSnapshot(ctx, id)
+		if err != nil || snap == nil {
+			continue
+		}
+		for _, c := range snap.Containers {
+			if c.ID == containerID || strings.HasPrefix(c.ID, containerID) || c.Name == containerID {
+				return c, true
+			}
+		}
+	}
+	return ContainerState{}, false
+}
+
+func labelListsPolicy(raw, name string) bool {
+	for _, part := range strings.Split(raw, ",") {
+		if strings.TrimSpace(part) == name {
+			return true
+		}
+	}
+	return false
 }
 
 func evaluatePolicyRules(dsl string) []ruleSetView {
@@ -700,7 +815,7 @@ func renderPolicyViews(parsed []*policy.Policy) ([]ruleSetView, []string, error)
 		for _, rs := range compiled.RuleSets {
 			views = append(views, ruleSetView{
 				Name:      rs.Name,
-				Ports:     append([]uint16(nil), rs.Ports...),
+				Ports:     append([]uint16{}, rs.Ports...),
 				Allowlist: cidrsToStrings(rs.Allowlist),
 				Blocklist: cidrsToStrings(rs.Blocklist),
 				Protocol:  rs.Protocol,
@@ -847,6 +962,14 @@ func (s *HTTPServer) handleAutogenAction(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	_ = s.Registry.store.DeleteProposal(r.Context(), agentID, containerID)
+	changeFields := map[string]string{"container_id": containerID}
+	if mode, ok := payload["mode"].(string); ok {
+		changeFields["mode"] = mode
+	}
+	if reason, ok := payload["reason"].(string); ok {
+		changeFields["reason"] = reason
+	}
+	s.recordChange(r, "autogen_"+action+"d", agentID, changeFields)
 	resp := map[string]any{
 		"id":      cmd.ID,
 		"agent":   agentID,
@@ -991,6 +1114,7 @@ func (s *HTTPServer) handleFleetContainerAction(w http.ResponseWriter, r *http.R
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	s.recordChange(r, containerChangeAction(action), agentID, map[string]string{"container_id": containerID})
 	writeJSON(w, http.StatusOK, map[string]any{"id": containerID, "action": action, "status": "ok"})
 }
 
@@ -1032,6 +1156,7 @@ func (s *HTTPServer) handleFleetContainerBulk(w http.ResponseWriter, r *http.Req
 			resp.Summary.Failed++
 		} else {
 			res.Status = "ok"
+			s.recordChange(r, containerChangeAction(a.Action), agentID, map[string]string{"container_id": a.ID, "bulk": "true"})
 			if a.Action == "apply" {
 				resp.Summary.Applied++
 			} else {
@@ -1094,4 +1219,11 @@ func containerCommandKind(action string) (CommandKind, error) {
 		return CommandDisable, nil
 	}
 	return "", errors.New("unsupported action: " + action)
+}
+
+func containerChangeAction(action string) string {
+	if action == "apply" {
+		return "container_firewall_applied"
+	}
+	return "container_firewall_disabled"
 }

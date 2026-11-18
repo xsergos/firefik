@@ -8,6 +8,7 @@ import AgentTokensPage from "./AgentTokensPage";
 
 vi.mock("@/lib/fleetApi", () => ({
   fetchAgentTokens: vi.fn(),
+  fetchAgents: vi.fn(),
   createAgentToken: vi.fn(),
   revokeAgentToken: vi.fn(),
 }));
@@ -55,6 +56,20 @@ beforeEach(async () => {
     token: "agt_aabbccddeeffaabbccddeeffaabbccddeeffaabbccddeeffaabbccddeeffaa11",
   });
   vi.mocked(api.revokeAgentToken).mockResolvedValue();
+  vi.mocked(api.fetchAgents).mockResolvedValue([
+    {
+      instance_id: "prod-1",
+      hostname: "prod-1",
+      version: "v1",
+      backend: "nftables",
+      chain: "FIREFIK",
+      first_seen: "2026-04-23T10:00:00Z",
+      last_seen: "2026-04-23T11:00:00Z",
+      event_count: 0,
+      has_snapshot: true,
+      status: "dead",
+    },
+  ]);
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -67,6 +82,54 @@ describe("AgentTokensPage", () => {
     expect(screen.getByText("primary")).toBeInTheDocument();
     expect(screen.getByText("active")).toBeInTheDocument();
     expect(screen.getByText(/10\.0\.0\.5/)).toBeInTheDocument();
+  });
+
+  it("labels the token time as the last connection and explains it", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByText("prod-1")).toBeInTheDocument());
+    expect(screen.queryByText("Last seen")).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Last connected" })).toHaveAttribute(
+      "title",
+      expect.stringMatching(/Regular check-ins do not change it/),
+    );
+    expect(screen.getByText(/10\.0\.0\.5/)).toHaveAttribute(
+      "title",
+      expect.stringMatching(/answers a command from the panel/),
+    );
+  });
+
+  it("points most hosts at Add agent and links the agent column to its page", async () => {
+    renderPage();
+    await screen.findByRole("heading", { name: "Agent tokens" });
+    expect(screen.getByRole("heading", { name: "Tokens" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Add agent/ })).toHaveAttribute("href", "/fleet/add");
+    expect(await screen.findByRole("link", { name: "Open agent prod-1" })).toHaveAttribute(
+      "href",
+      "/fleet/prod-1",
+    );
+  });
+
+  it("shows relative times with the absolute time on hover and a readable issuer", async () => {
+    const api = await import("@/lib/fleetApi");
+    vi.mocked(api.fetchAgentTokens).mockResolvedValue([
+      {
+        id: "id-9",
+        name: "edge-9",
+        description: "",
+        issued_by: "fp:abcdef@10.1.1.1",
+        issued_at: new Date(Date.now() - 2 * 3600_000).toISOString(),
+        last_used_at: null,
+        last_used_ip: "",
+        revoked_at: null,
+      },
+    ]);
+    renderPage();
+    const issued = await screen.findByText("2h ago");
+    expect(issued.getAttribute("title")).toBeTruthy();
+    expect(screen.getByText("Operator token (10.1.1.1)")).toHaveAttribute(
+      "title",
+      "fp:abcdef@10.1.1.1",
+    );
   });
 
   it("disables Issue when name is blank", async () => {
@@ -88,26 +151,29 @@ describe("AgentTokensPage", () => {
     expect(screen.getByText(/agt_aabbccddeeff/)).toBeInTheDocument();
   });
 
+  it("shows the status of the agent that owns the token", async () => {
+    renderPage();
+    expect(await screen.findByText("dead")).toBeInTheDocument();
+  });
+
   it("revokes a token after confirmation", async () => {
     const api = await import("@/lib/fleetApi");
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPage();
     await screen.findByRole("heading", { name: "Agent tokens" });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Revoke" }));
+    await user.click(await screen.findByRole("button", { name: "Revoke token" }));
     await waitFor(() => expect(api.revokeAgentToken).toHaveBeenCalledWith("id-1"));
-    confirm.mockRestore();
   });
 
   it("skips revoke when the operator cancels the confirm dialog", async () => {
     const api = await import("@/lib/fleetApi");
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     renderPage();
     await screen.findByRole("heading", { name: "Agent tokens" });
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Revoke" }));
+    await user.click(await screen.findByRole("button", { name: "Cancel" }));
     expect(api.revokeAgentToken).not.toHaveBeenCalled();
-    confirm.mockRestore();
   });
 
   it("renders empty state when no tokens exist", async () => {

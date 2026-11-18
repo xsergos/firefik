@@ -18,9 +18,10 @@ func NewNFTablesBackend(chainName string, _ *slog.Logger) (*NFTablesBackend, err
 	return nil, fmt.Errorf("nftables backend is only supported on Linux")
 }
 
-func (b *NFTablesBackend) SetupChains() error { return nil }
-func (b *NFTablesBackend) Cleanup() error     { return nil }
-func (b *NFTablesBackend) SetStateful(v bool) {}
+func (b *NFTablesBackend) SetupChains() error                  { return nil }
+func (b *NFTablesBackend) Cleanup() error                      { return nil }
+func (b *NFTablesBackend) SetStateful(v bool)                  {}
+func (b *NFTablesBackend) SetDefaultDropLogRate(perSecond int) {}
 
 func (b *NFTablesBackend) ApplyContainerRules(
 	containerID, containerName string,

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,7 +37,9 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={qc}>
-      <ProposalsPage />
+      <MemoryRouter>
+        <ProposalsPage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -89,6 +92,12 @@ afterEach(() => {
 });
 
 describe("ProposalsPage", () => {
+  it("titles the page like the nav and keeps env vars out of the header", async () => {
+    renderPage();
+    const heading = screen.getByRole("heading", { level: 1, name: "Proposals" });
+    expect(heading.parentElement?.textContent).not.toMatch(/FIREFIK_/);
+  });
+
   it("defaults to the pending bucket and lists pending proposals only", async () => {
     renderPage();
     await waitFor(() =>
@@ -120,7 +129,7 @@ describe("ProposalsPage", () => {
     );
     await user.click(screen.getByRole("button", { name: "rejected" }));
     await waitFor(() =>
-      expect(screen.getByText(/No proposals in this bucket/i)).toBeInTheDocument(),
+      expect(screen.getByText(/No proposals with this status/i)).toBeInTheDocument(),
     );
   });
 

@@ -21,12 +21,13 @@ import (
 const nftTableName = "firefik"
 
 type NFTablesBackend struct {
-	conn      *nftables.Conn
-	table     *nftables.Table
-	fwdChain  *nftables.Chain
-	chainName string
-	logger    *slog.Logger
-	stateful  bool
+	conn           *nftables.Conn
+	table          *nftables.Table
+	fwdChain       *nftables.Chain
+	chainName      string
+	logger         *slog.Logger
+	stateful       bool
+	defaultDropLog int
 }
 
 var _ Backend = (*NFTablesBackend)(nil)
@@ -40,6 +41,20 @@ func NewNFTablesBackend(chainName string, logger *slog.Logger) (*NFTablesBackend
 }
 
 func (b *NFTablesBackend) SetStateful(v bool) { b.stateful = v }
+
+func (b *NFTablesBackend) SetDefaultDropLogRate(perSecond int) { b.defaultDropLog = perSecond }
+
+func defaultDropLogExprs(perSecond int, label string) []expr.Any {
+	return []expr.Any{
+		&expr.Limit{
+			Type:  expr.LimitTypePkts,
+			Rate:  uint64(perSecond), // #nosec G115 -- rate is a small positive config value
+			Unit:  expr.LimitTimeSecond,
+			Burst: uint32(perSecond), // #nosec G115 -- rate is a small positive config value
+		},
+		nflogExpr(label, "DROP"),
+	}
+}
 
 func (b *NFTablesBackend) SetupChains() error {
 	b.table = b.conn.AddTable(&nftables.Table{
@@ -457,7 +472,7 @@ func (b *NFTablesBackend) ApplyContainerRules(
 				exprs := srcNetMatchExprs(bl)
 				exprs = append(exprs, protoPortExprs(proto, port)...)
 				if rs.Log {
-					exprs = append(exprs, nflogExpr(rs.LogPrefix, "DROP"))
+					exprs = append(exprs, nflogExpr(ruleLogLabel(rs.LogPrefix, rs.Name), "DROP"))
 				}
 				exprs = append(exprs, &expr.Counter{}, &expr.Verdict{Kind: expr.VerdictDrop})
 				b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: rsChain, Exprs: exprs})
@@ -465,14 +480,14 @@ func (b *NFTablesBackend) ApplyContainerRules(
 
 			for _, al := range allowlist {
 				if rs.RateLimit != nil {
-					if err := b.addPerSourceLimitRules(rsChain, al, proto, port, containerID, rs.Name, rs.RateLimit, rs.LogPrefix, rs.Log); err != nil {
+					if err := b.addPerSourceLimitRules(rsChain, al, proto, port, containerID, rs.Name, rs.RateLimit, ruleLogLabel(rs.LogPrefix, rs.Name), rs.Log); err != nil {
 						return fmt.Errorf("rate-limit rule for %s/%d: %w", rs.Name, port, err)
 					}
 				} else {
 					exprs := srcNetMatchExprs(al)
 					exprs = append(exprs, protoPortExprs(proto, port)...)
 					if rs.Log {
-						exprs = append(exprs, nflogExpr(rs.LogPrefix, "ACCEPT"))
+						exprs = append(exprs, nflogExpr(ruleLogLabel(rs.LogPrefix, rs.Name), "ACCEPT"))
 					}
 					exprs = append(exprs, &expr.Counter{}, &expr.Verdict{Kind: expr.VerdictAccept})
 					b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: rsChain, Exprs: exprs})
@@ -482,7 +497,12 @@ func (b *NFTablesBackend) ApplyContainerRules(
 			if len(allowlist) > 0 {
 				exprs := protoPortExprs(proto, port)
 				if rs.Log {
-					exprs = append(exprs, nflogExpr(rs.LogPrefix, "DROP"))
+					exprs = append(exprs, nflogExpr(ruleLogLabel(rs.LogPrefix, rs.Name), "DROP"))
+				} else if b.defaultDropLog > 0 {
+					b.conn.AddRule(&nftables.Rule{
+						Table: b.table, Chain: rsChain,
+						Exprs: append(protoPortExprs(proto, port), defaultDropLogExprs(b.defaultDropLog, ruleLogLabel(rs.LogPrefix, rs.Name))...),
+					})
 				}
 				exprs = append(exprs, &expr.Counter{}, &expr.Verdict{Kind: expr.VerdictDrop})
 				b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: rsChain, Exprs: exprs})
@@ -509,6 +529,12 @@ func (b *NFTablesBackend) ApplyContainerRules(
 		verdict = expr.VerdictReturn
 	default:
 		verdict = expr.VerdictDrop
+	}
+	if verdict == expr.VerdictDrop && b.defaultDropLog > 0 {
+		b.conn.AddRule(&nftables.Rule{
+			Table: b.table, Chain: mainChain,
+			Exprs: defaultDropLogExprs(b.defaultDropLog, DefaultPolicyLogLabel),
+		})
 	}
 	b.conn.AddRule(&nftables.Rule{
 		Table: b.table, Chain: mainChain,
@@ -688,14 +714,8 @@ func srcNetMatchExprs(n net.IPNet) []expr.Any {
 	}
 }
 
-func nflogExpr(logPrefix, actionType string) *expr.Log {
-	prefix := logPrefix
-	if prefix == "" {
-		prefix = "FIREFIK " + actionType
-	}
-	if len(prefix) > LogPrefixMaxLen {
-		prefix = prefix[:LogPrefixMaxLen]
-	}
+func nflogExpr(label, actionType string) *expr.Log {
+	prefix := NflogPrefix(actionType, label)
 	return &expr.Log{
 		Key:   (1 << unix.NFTA_LOG_PREFIX) | (1 << unix.NFTA_LOG_GROUP),
 		Group: uint16(NflogGroup),

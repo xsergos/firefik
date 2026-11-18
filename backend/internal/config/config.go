@@ -65,6 +65,8 @@ type Config struct {
 	EffectiveChain      string
 	DriftCheckInterval  int
 	StatefulAccept      bool
+	LogDefaultDrop      bool
+	LogDefaultDropRate  int
 	APITokenFile        string
 	WSMaxSubscribers    int
 	MetricsRateRPS      float64
@@ -154,6 +156,8 @@ func Load() *Config {
 		CleanupOldSuffixes:  getEnvList("FIREFIK_CLEANUP_OLD_SUFFIXES"),
 		DriftCheckInterval:  int(getEnvInt64("FIREFIK_DRIFT_CHECK_INTERVAL", 300)),
 		StatefulAccept:      getEnvBool("FIREFIK_STATEFUL_ACCEPT", true),
+		LogDefaultDrop:      getEnvBool("FIREFIK_LOG_DEFAULT_DROP", true),
+		LogDefaultDropRate:  int(getEnvInt64("FIREFIK_LOG_DEFAULT_DROP_RATE", 10)),
 		APITokenFile:        SafePath(os.Getenv("FIREFIK_API_TOKEN_FILE")),
 		WSMaxSubscribers:    int(getEnvInt64("FIREFIK_WS_MAX_SUBSCRIBERS", 20)),
 		MetricsRateRPS:      getEnvFloat("FIREFIK_METRICS_RATE_RPS", 1.0),
@@ -212,6 +216,13 @@ func (c *Config) EffectiveChainName() string {
 		return c.ChainName
 	}
 	return c.ChainName + "-" + c.ChainSuffix
+}
+
+func (c *Config) DefaultDropLogRate() int {
+	if !c.LogDefaultDrop || c.LogDefaultDropRate <= 0 {
+		return 0
+	}
+	return min(c.LogDefaultDropRate, 1000)
 }
 
 func (c *Config) ControlPlaneProxyURL() string {

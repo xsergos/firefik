@@ -142,7 +142,7 @@ func (d *Dispatcher) collectStats(ctx context.Context) (map[string]any, error) {
 	}
 	if d.deps.Traffic != nil {
 		buckets := d.deps.Traffic.Last(60)
-		traffic := make([]map[string]any, 0, len(buckets))
+		traffic := make([]any, 0, len(buckets))
 		for _, b := range buckets {
 			traffic = append(traffic, map[string]any{
 				"ts":       b.Timestamp,

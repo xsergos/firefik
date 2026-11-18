@@ -20,6 +20,8 @@ type Registry struct {
 	logger     *slog.Logger
 	store      Store
 	logHub     *LogHub
+	flows      *FlowAggregator
+	flowTTL    time.Duration
 }
 
 type agentEntry struct {
@@ -42,6 +44,10 @@ func NewRegistryWithStore(logger *slog.Logger, store Store) *Registry {
 		logger:     logger,
 		store:      store,
 		logHub:     NewLogHub(),
+		flowTTL:    DefaultFlowRetention,
+	}
+	if store != nil {
+		r.flows = NewFlowAggregator(store, logger)
 	}
 	r.hydrate(context.Background())
 	return r
@@ -49,10 +55,31 @@ func NewRegistryWithStore(logger *slog.Logger, store Store) *Registry {
 
 func (r *Registry) LogHub() *LogHub { return r.logHub }
 
+func (r *Registry) SetFlowRetention(d time.Duration) { r.flowTTL = d }
+
 func (r *Registry) PublishLog(line LogLine) {
 	if r.logHub != nil {
 		r.logHub.Publish(line)
 	}
+	if r.flows != nil && line.Source == "nflog" {
+		if rec, ok := flowRecordFromFields(line.Agent.InstanceID, line.At, line.Fields); ok {
+			r.flows.Add(rec)
+		}
+	}
+}
+
+func (r *Registry) RunFlowFlush(ctx context.Context, interval time.Duration) {
+	if r.flows == nil {
+		return
+	}
+	r.flows.Run(ctx, interval)
+}
+
+func (r *Registry) FlushFlows(ctx context.Context) error {
+	if r.flows == nil {
+		return nil
+	}
+	return r.flows.Flush(ctx)
 }
 
 func (r *Registry) hydrate(ctx context.Context) {
@@ -101,6 +128,18 @@ func (r *Registry) upsertAgent(id AgentIdentity) *agentEntry {
 		}
 	}
 	return e
+}
+
+func (r *Registry) RemoveAgent(ctx context.Context, agentID string) (bool, error) {
+	r.mu.Lock()
+	_, inMem := r.agents[agentID]
+	delete(r.agents, agentID)
+	delete(r.commands, agentID)
+	r.mu.Unlock()
+	if r.store == nil {
+		return inMem, nil
+	}
+	return r.store.DeleteAgent(ctx, agentID)
 }
 
 func (r *Registry) Agents() []agentEntry {
@@ -241,6 +280,9 @@ func (r *Registry) RunRetentionLoop(ctx context.Context, interval time.Duration,
 			if n, err := r.store.TrimSnapshots(ctx, snapshotsPerAgent); err == nil && n > 0 && r.logger != nil {
 				r.logger.Debug("control-plane snapshots trimmed", "count", n)
 			}
+			if n, err := r.store.PruneFlows(ctx, r.flowTTL); err == nil && n > 0 && r.logger != nil {
+				r.logger.Debug("control-plane flow log pruned", "count", n)
+			}
 			if size, err := r.store.BytesOnDisk(ctx); err == nil {
 				cpDBBytes.Set(float64(size))
 			}
@@ -262,6 +304,12 @@ type HTTPServer struct {
 	Audit         AuditEmitter
 	Authenticator OperatorAuthenticator
 	Sessions      *SessionStore
+	PanelConfig   PanelConfig
+}
+
+type PanelConfig struct {
+	EnrollURL    string `json:"enroll_url"`
+	GRPCEndpoint string `json:"grpc_endpoint"`
 }
 
 func (s *HTTPServer) Handler() http.Handler {
@@ -294,12 +342,15 @@ func (s *HTTPServer) Handler() http.Handler {
 		if s.Registry.LogHub() != nil {
 			mux.HandleFunc("/v1/logs", s.requireBearer(s.handleFleetLogsWS))
 		}
+		mux.HandleFunc("/v1/flows", s.requireBearer(s.handleFlows))
 	}
 	if s.Authenticator != nil && s.Sessions != nil {
 		mux.HandleFunc("/v1/login", s.handleLogin)
 		mux.HandleFunc("/v1/logout", s.handleLogout)
 	}
 	mux.HandleFunc("/v1/whoami", s.handleWhoami)
+	mux.HandleFunc("/v1/panel-config", s.requireBearer(s.handlePanelConfig))
+	mux.HandleFunc("/v1/panel-session", s.handlePanelSession)
 	mux.Handle("/metrics", http.HandlerFunc(s.requireBearer(promhttp.Handler().ServeHTTP)))
 	return mux
 }
@@ -328,4 +379,28 @@ func (s *HTTPServer) requireBearer(next http.HandlerFunc) http.HandlerFunc {
 		}
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	}
+}
+
+func (s *HTTPServer) handlePanelConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, http.StatusOK, s.PanelConfig)
+}
+
+func (s *HTTPServer) handlePanelSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.Authenticator == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if _, ok := s.sessionFromRequest(r); ok {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Error(w, "unauthorized", http.StatusUnauthorized)
 }

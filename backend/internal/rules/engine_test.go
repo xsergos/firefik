@@ -480,6 +480,62 @@ func TestRemoveContainerWithAuditLogger(t *testing.T) {
 	}
 }
 
+type removeCaptureSink struct {
+	mu     sync.Mutex
+	events []audit.Event
+}
+
+func (s *removeCaptureSink) Write(ev audit.Event) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append(s.events, ev)
+	return nil
+}
+
+func (s *removeCaptureSink) Close() error { return nil }
+
+func (s *removeCaptureSink) count(action string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for _, ev := range s.events {
+		if ev.Action == action {
+			n++
+		}
+	}
+	return n
+}
+
+func TestRemoveContainerAuditsOncePerRemoval(t *testing.T) {
+	eng, back, doc := newFullEngine(t)
+	sink := &removeCaptureSink{}
+	eng.SetAuditLogger(audit.New(slog.New(slog.NewTextHandler(io.Discard, nil))).WithSink(sink))
+	ctr := makeContainer("444444444444", "stopme", "10.0.0.70")
+	doc.setContainers(ctr)
+
+	if err := eng.ApplyContainer(context.Background(), "444444444444", audit.SourceEvent); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	for range 3 {
+		if err := eng.RemoveContainer("444444444444", audit.SourceEvent); err != nil {
+			t.Fatalf("remove: %v", err)
+		}
+	}
+	if got := sink.count("remove"); got != 1 {
+		t.Errorf("remove audit events = %d, want 1", got)
+	}
+	if back.removeCallCount() != 3 {
+		t.Errorf("backend remove calls = %d, want 3", back.removeCallCount())
+	}
+
+	if err := eng.RemoveContainer("555555555555", audit.SourceAPI); err != nil {
+		t.Fatalf("remove untracked: %v", err)
+	}
+	if got := sink.count("remove"); got != 1 {
+		t.Errorf("untracked remove emitted an audit event, total = %d", got)
+	}
+}
+
 func TestRehydrate(t *testing.T) {
 	back := newRecordingBackend()
 	back.seedApplied("aaaaaaaaaaaa", "bbbbbbbbbbbb")

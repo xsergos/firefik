@@ -2,6 +2,7 @@
     auto_https off
     servers {
         protocols h1
+        trusted_proxies static private_ranges
     }
 }
 
@@ -17,9 +18,16 @@
         -Server
     }
 
-    handle /api/* {
-        uri strip_prefix /api
+    handle_path /api/* {
         rewrite * /v1{uri}
+        @needs_session not path /v1/login /v1/logout
+        forward_auth @needs_session https://controlplane:8443 {
+            uri /v1/panel-session
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+        }
         reverse_proxy https://controlplane:8443 {
             header_up Authorization "Bearer {env.FIREFIK_OPERATOR_TOKEN}"
             transport http {
@@ -31,6 +39,19 @@
 
     handle /health {
         respond "ok" 200
+    }
+
+    @help_chunk path_regexp help ^/assets/HelpPage-[^/]+\.js$
+    handle @help_chunk {
+        forward_auth https://controlplane:8443 {
+            uri /v1/panel-session
+            transport http {
+                tls
+                tls_insecure_skip_verify
+            }
+        }
+        root * /srv
+        file_server
     }
 
     handle {

@@ -67,6 +67,8 @@ Columns:
 | `FIREFIK_AUTO_ALLOWLIST` | `true` | bool | agent | | Auto-allow `firefik.enable=true` containers. |
 | `FIREFIK_ENABLE_IPV6` | `false` | bool | agent | | Install `ip6tables`/`inet` rules. |
 | `FIREFIK_STATEFUL_ACCEPT` | `true` | bool | agent | | Adds `ESTABLISHED,RELATED` accept to base chain. |
+| `FIREFIK_LOG_DEFAULT_DROP` | `true` | bool | agent | | Logs dropped packets to NFLOG (rate-limited) even without `log: true`: traffic hitting a container's or the host's default `DROP` policy, and traffic to a listed port from a source outside its allowlist. They show up in the panel's Traffic log. |
+| `FIREFIK_LOG_DEFAULT_DROP_RATE` | `10` | int (pkt/s) | agent | | Rate limit for default-policy drop logging, per container chain; `0` disables, capped at 1000. |
 | `FIREFIK_DRIFT_CHECK_INTERVAL` | `300` | int (sec) | agent | | Kernel-drift reconcile interval. |
 | `FIREFIK_SCHEDULE_INTERVAL` | `60` | int (sec) | agent | | Time-window rule scheduler tick. |
 | `FIREFIK_CONFIG` | `/etc/firefik/rules.conf` | path | agent | | Legacy rules-file source. |
@@ -224,6 +226,9 @@ for flags.
 | `--db` | `$FIREFIK_CP_DB` | SQLite path; `:memory:` for in-memory |
 | `--command-ttl` | `24h` | Pending command expiry |
 | `--audit-retention` | `2160h` (90d) | Audit row retention |
+| `--flow-retention` | `168h` (7d) | Traffic log (dropped/accepted packets) retention; `0` keeps forever |
+| `--public-enroll-url` | `$FIREFIK_CP_PUBLIC_ENROLL_URL` | Agent-facing URL that serves `/v1/enroll`; prefilled on the panel's Add agent page |
+| `--public-grpc-endpoint` | `$FIREFIK_CP_PUBLIC_GRPC` | Agent-facing `host:port` of the gRPC listener; prefilled on the panel's Add agent page |
 | `--snapshots-per-agent` | `100` | Per-agent snapshot cap |
 | `--retention-interval` | `15m` | Retention loop period |
 | `--renew-window` | `$FIREFIK_CP_CERT_RENEW_WINDOW` (`72h`) | `RenewCert` rejects certs with more than this left; keep ≥ agent renew-before |

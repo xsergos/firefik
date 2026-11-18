@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { approveAutogen, fetchAutogenProposals, rejectAutogen } from "@/lib/api";
+import { EmptyState } from "@/components/shared/EmptyState";
 import type { AutogenApproveResponse, AutogenProposal } from "@/types/api";
 
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
@@ -75,11 +76,12 @@ export default function ProposalsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Autogen Proposals</h1>
-        <span className="text-sm text-muted-foreground">
-          Observe-mode learning. Enable with <code>FIREFIK_AUTOGEN_MODE=observe</code>.
-        </span>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-semibold">Proposals</h1>
+        <p className="text-sm text-muted-foreground">
+          Rules suggested from the traffic each container really uses. Approve one to get labels or
+          a policy you can paste into your setup.
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
@@ -101,7 +103,13 @@ export default function ProposalsPage() {
 
       {isLoading && <p className="text-sm text-muted-foreground">Loading proposals…</p>}
       {proposals.length === 0 && !isLoading && (
-        <p className="text-sm text-muted-foreground">No proposals in this bucket.</p>
+        <EmptyState title="No proposals with this status." helpAnchor="proposals">
+          <p>
+            Agents with learning mode switched on watch which ports and peers each container really
+            uses and suggest rules here. Approve a proposal to get ready-to-paste labels or a policy
+            snippet. Help explains how to switch learning mode on.
+          </p>
+        </EmptyState>
       )}
 
       {proposals.length > 0 && (

@@ -505,6 +505,36 @@ describe("simulatePolicy", () => {
     expect(out.policy).toBe("p");
   });
 
+  it("accepts null lists in rule sets and turns them into empty arrays", async () => {
+    installFetch(
+      vi.fn(async () =>
+        mockJSON(
+          {
+            policy: "web-public",
+            defaultPolicy: "DROP",
+            ruleSets: [
+              {
+                name: "web-public-1",
+                ports: null,
+                allowlist: null,
+                blocklist: null,
+                geoBlock: ["RU", "CN"],
+              },
+            ],
+          },
+          { status: 200 },
+        ),
+      ) as typeof fetch,
+    );
+    const out = await simulatePolicy("web-public", {});
+    expect(out.ruleSets[0]).toMatchObject({
+      ports: [],
+      allowlist: [],
+      blocklist: [],
+      geoBlock: ["RU", "CN"],
+    });
+  });
+
   it("throws APIError with typed body", async () => {
     installFetch(
       vi.fn(async () =>

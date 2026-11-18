@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RuleEntry } from "@/types/api";
@@ -29,9 +30,11 @@ function renderPage() {
     },
   });
   return render(
-    <QueryClientProvider client={qc}>
-      <RulesPage />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <RulesPage />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -82,10 +85,11 @@ afterEach(() => {
 describe("RulesPage", () => {
   it("renders the heading and the container card after fetch resolves", async () => {
     renderPage();
-    expect(await screen.findByText("Active Rules")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Rules" })).toBeInTheDocument();
     expect(await screen.findByText("nginx")).toBeInTheDocument();
     expect(screen.getByText("abcdef012345")).toBeInTheDocument();
-    expect(screen.getByText("DROP")).toBeInTheDocument();
+    expect(screen.getByText("Blocked")).toBeInTheDocument();
+    expect(screen.queryByText("DROP")).not.toBeInTheDocument();
     expect(screen.getByText("running")).toBeInTheDocument();
   });
 
@@ -180,14 +184,43 @@ describe("RulesPage", () => {
       },
     ]);
     renderPage();
-    await waitFor(() => expect(screen.getByText("alpha")).toBeInTheDocument());
-    expect(screen.getByText("beta")).toBeInTheDocument();
+    const agent1 = await screen.findByRole("link", { name: "agent-1" });
+    expect(agent1).toHaveAttribute("href", "/fleet/agent-1");
+    expect(agent1).toHaveAttribute("title", "Host: alpha");
+    expect(screen.getByRole("link", { name: "agent-2" })).toHaveAttribute("title", "Host: beta");
+    expect(screen.queryByText("alpha")).not.toBeInTheDocument();
     expect(screen.getAllByText("Host firewall").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Containers").length).toBeGreaterThan(0);
-    expect(screen.getByText("agent-1")).toBeInTheDocument();
-    expect(screen.getByText("agent-2")).toBeInTheDocument();
-    expect(screen.getByText("1 host · 1 container")).toBeInTheDocument();
-    expect(screen.getByText("0 host · 1 container")).toBeInTheDocument();
+    expect(screen.getByText("Host firewall · 1 container")).toBeInTheDocument();
+    expect(screen.getByText("1 container")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "redis" })).toHaveAttribute(
+      "href",
+      "/containers?agent=agent-2&name=redis&exact=1",
+    );
+  });
+
+  it("pluralises the container count", async () => {
+    const api = await import("@/lib/api");
+    vi.mocked(api.fetchRules).mockResolvedValue([
+      { ...baseEntry, agent_id: "agent-1" },
+      { ...baseEntry, containerID: "ffeeddccbbaa", containerName: "redis", agent_id: "agent-1" },
+    ]);
+    renderPage();
+    expect(await screen.findByText("2 containers")).toBeInTheDocument();
+  });
+
+  it("hides the Flags column when no rule set has flags", async () => {
+    const api = await import("@/lib/api");
+    vi.mocked(api.fetchRules).mockResolvedValue([hostEntry]);
+    renderPage();
+    await screen.findByText("ssh");
+    expect(screen.queryByRole("columnheader", { name: "Flags" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the Flags column when a rule set has flags", async () => {
+    renderPage();
+    await screen.findByText("web");
+    expect(screen.getByRole("columnheader", { name: "Flags" })).toBeInTheDocument();
   });
 
   it("renders 'local agent' label when agent info missing", async () => {

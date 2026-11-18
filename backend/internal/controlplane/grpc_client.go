@@ -377,8 +377,14 @@ func toPBAck(in CommandAck) *pb.CommandAck {
 		CompletedAt: timestamppb.New(in.CompletedAt),
 	}
 	if len(in.ResultPayload) > 0 {
-		if p, err := structpb.NewStruct(in.ResultPayload); err == nil {
+		p, err := structpb.NewStruct(in.ResultPayload)
+		if err == nil {
 			out.ResultPayload = p
+		} else {
+			out.Success = false
+			if out.Error == "" {
+				out.Error = "encode result payload: " + err.Error()
+			}
 		}
 	}
 	return out

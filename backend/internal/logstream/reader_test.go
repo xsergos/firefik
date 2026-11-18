@@ -109,11 +109,65 @@ func TestBuildLogEntry_GarbagePayloadDoesNotPanic(t *testing.T) {
 	}
 }
 
+func TestParsePrefix(t *testing.T) {
+	cases := []struct {
+		prefix, action, rule string
+	}{
+		{"FIREFIK DROP", "DROP", ""},
+		{"FIREFIK DROP default", "DROP", "default"},
+		{"FIREFIK ACCEPT web-public@v4", "ACCEPT", "web-public@v4"},
+		{"FIREFIK DROP host ssh", "DROP", "host ssh"},
+		{"firefik-host-DROP", "DROP", "host"},
+		{"FIREFIK custom", "", "custom"},
+	}
+	for _, tc := range cases {
+		action, rule, ok := parsePrefix(tc.prefix)
+		if !ok || action != tc.action || rule != tc.rule {
+			t.Errorf("parsePrefix(%q) = %q, %q, %v; want %q, %q", tc.prefix, action, rule, ok, tc.action, tc.rule)
+		}
+	}
+	if _, _, ok := parsePrefix("other-tool"); ok {
+		t.Error("foreign prefix must be rejected")
+	}
+}
+
+func TestAttachContainer(t *testing.T) {
+	resolve := func(ip string) (string, string) {
+		if ip == "10.0.0.2" {
+			return "abc123", "web"
+		}
+		return "", ""
+	}
+	e := LogEntry{Rule: "default", SrcIP: "1.2.3.4", DstIP: "10.0.0.2"}
+	attachContainer(&e, resolve)
+	if e.Container != "web" || e.ContainerID != "abc123" {
+		t.Errorf("dst resolve: %+v", e)
+	}
+
+	egress := LogEntry{Rule: "x", SrcIP: "10.0.0.2", DstIP: "8.8.8.8"}
+	attachContainer(&egress, resolve)
+	if egress.Container != "web" {
+		t.Errorf("src resolve: %+v", egress)
+	}
+
+	host := LogEntry{Rule: "host ssh", DstIP: "10.0.0.2"}
+	attachContainer(&host, resolve)
+	if host.Container != HostContainer || host.ContainerID != "" {
+		t.Errorf("host rule: %+v", host)
+	}
+
+	unknown := LogEntry{Rule: "x", DstIP: "9.9.9.9"}
+	attachContainer(&unknown, nil)
+	if unknown.Container != "" {
+		t.Errorf("nil resolver: %+v", unknown)
+	}
+}
+
 func TestStartNflogReader_OpenError(t *testing.T) {
 	hub := NewHub(discardLogger())
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	err := StartNflogReader(ctx, 0, hub, discardLogger(), nil, nil)
+	err := StartNflogReader(ctx, 0, hub, discardLogger(), nil, nil, nil)
 	if err == nil {
 		t.Skip("nflog open succeeded — skipping (likely on Linux with privileges)")
 	}

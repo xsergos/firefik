@@ -197,6 +197,88 @@ export function fetchAgentStats(id: string): Promise<AgentLiveStats> {
   return getJSON(`/api/agents/${encodeURIComponent(id)}/stats`, agentLiveStatsSchema);
 }
 
+const flowRowSchema = z.object({
+  agent_id: z.string(),
+  action: z.string(),
+  container: z.string(),
+  src_ip: z.string(),
+  dst_port: z.number(),
+  proto: z.string(),
+  rule: z.string(),
+  count: z.number(),
+  first_seen: z.string(),
+  last_seen: z.string(),
+});
+
+const flowResultSchema = z.object({
+  rows: z
+    .array(flowRowSchema)
+    .nullable()
+    .transform((v) => v ?? []),
+  summary: z.object({
+    total: z.number(),
+    unique_sources: z.number(),
+    top_port: z.number(),
+    top_port_count: z.number(),
+  }),
+  hourly: z
+    .array(z.object({ at: z.string(), count: z.number() }))
+    .nullable()
+    .transform((v) => v ?? []),
+});
+
+export type FlowRow = z.infer<typeof flowRowSchema>;
+export type FlowResult = z.infer<typeof flowResultSchema>;
+
+export interface FlowFilters {
+  since: string;
+  agent_id?: string;
+  container?: string;
+  src?: string;
+  port?: string;
+  action?: "DROP" | "ACCEPT" | "";
+}
+
+export function fetchFlows(filters: FlowFilters): Promise<FlowResult> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) {
+    if (v) qs.set(k, String(v));
+  }
+  return getJSON(`/api/flows?${qs.toString()}`, flowResultSchema);
+}
+
+const panelConfigSchema = z.object({
+  enroll_url: z.string().optional().default(""),
+  grpc_endpoint: z.string().optional().default(""),
+});
+
+export type PanelConfig = z.infer<typeof panelConfigSchema>;
+
+export function fetchPanelConfig(): Promise<PanelConfig> {
+  return getJSON("/api/panel-config", panelConfigSchema);
+}
+
+const policyVersionSchema = z.object({
+  version: z.string(),
+  sha: z.string(),
+  dsl: z.string(),
+  author: z.string().optional().default(""),
+  comment: z.string().optional().default(""),
+  committedAt: z.string(),
+});
+
+export type PolicyVersion = z.infer<typeof policyVersionSchema>;
+
+export function fetchPolicyVersions(name: string): Promise<PolicyVersion[]> {
+  return getJSON(
+    `/api/policies/${encodeURIComponent(name)}/versions`,
+    z
+      .array(policyVersionSchema)
+      .nullable()
+      .transform((v) => v ?? []),
+  );
+}
+
 const agentTokenSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -230,15 +312,20 @@ export function createAgentToken(name: string, description?: string): Promise<Ag
   return postJSON(`/api/agent-tokens`, { name, description }, agentTokenIssuedSchema);
 }
 
-export async function revokeAgentToken(id: string): Promise<void> {
-  const res = await fetch(`/api/agent-tokens/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    credentials: "same-origin",
-  });
+async function deleteResource(path: string): Promise<void> {
+  const res = await fetch(path, { method: "DELETE", credentials: "same-origin" });
   if (!res.ok) {
     const text = await res.text();
-    throw new FleetAPIError(res.status, text || `${res.status}`);
+    throw new FleetAPIError(res.status, text.trim() || `${res.status}`);
   }
+}
+
+export function revokeAgentToken(id: string): Promise<void> {
+  return deleteResource(`/api/agent-tokens/${encodeURIComponent(id)}`);
+}
+
+export function deleteAgent(id: string): Promise<void> {
+  return deleteResource(`/api/agents/${encodeURIComponent(id)}`);
 }
 
 const whoamiSchema = z.object({
