@@ -24,6 +24,9 @@
 #     never decodes untrusted zstd input.
 #   * GHSA-4w3g-jfj2-cw2q and GHSA-vvm8-gf78-28g4 (go-jose v3.0.5 panics) are
 #     MODERATE, below the release gate.
+#   * GHSA-q7gw-24fr-5p69 (otel sdk, sdk/log and trace v1.46.0, fix 1.47.0):
+#     the attribute value length limit is bypassed with U+FFFD runes. It is
+#     MODERATE, below the release gate.
 
 # === caddy gobinary, frontend + panel images ==================================
 #
