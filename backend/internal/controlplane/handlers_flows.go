@@ -3,6 +3,7 @@ package controlplane
 import (
 	"fmt"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -53,6 +54,20 @@ func (s *HTTPServer) handleFlows(w http.ResponseWriter, r *http.Request) {
 		Src:       strings.TrimSpace(qs.Get("src")),
 		Action:    strings.ToUpper(strings.TrimSpace(qs.Get("action"))),
 		Since:     since,
+	}
+	if strings.Contains(q.Src, "/") {
+		p, err := netip.ParsePrefix(q.Src)
+		if err != nil {
+			http.Error(w, "invalid src CIDR", http.StatusBadRequest)
+			return
+		}
+		q.SrcNet = p.Masked()
+		q.Src = ""
+	}
+	q.Scope = strings.ToLower(strings.TrimSpace(qs.Get("scope")))
+	if q.Scope != "" && q.Scope != FlowScopePrivate && q.Scope != FlowScopePublic {
+		http.Error(w, "scope must be private or public", http.StatusBadRequest)
+		return
 	}
 	if q.Action != "" && q.Action != "DROP" && q.Action != "ACCEPT" {
 		http.Error(w, "action must be DROP or ACCEPT", http.StatusBadRequest)

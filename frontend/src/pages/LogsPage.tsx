@@ -7,6 +7,12 @@ import { queryKeys } from "@/lib/queryKeys";
 import { isPanelMode } from "@/lib/panelMode";
 import { formatRelative } from "@/lib/time";
 import { bucketRange, hourlyBuckets, ruleLabel } from "@/lib/flows";
+import {
+  isValidSourceFilter,
+  PRIVATE_RANGE_LABEL,
+  sourceMatches,
+  type SourceScope,
+} from "@/lib/ip";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +35,7 @@ interface Filters {
   agent: string;
   container: string;
   src: string;
+  scope: SourceScope;
   port: string;
   action: ActionFilter;
 }
@@ -36,7 +43,14 @@ interface Filters {
 type FilterPatch = Partial<Filters>;
 type OnFilter = (patch: FilterPatch) => void;
 
-const NO_FILTERS: Filters = { agent: "", container: "", src: "", port: "", action: "" };
+const NO_FILTERS: Filters = {
+  agent: "",
+  container: "",
+  src: "",
+  scope: "",
+  port: "",
+  action: "",
+};
 
 const VIEWS: readonly (readonly [View, string])[] = [
   ["live", "Live"],
@@ -50,7 +64,13 @@ const ACTIONS: readonly (readonly [ActionFilter, string])[] = [
   ["", "All"],
 ];
 
-const TEXT_FILTER_KEYS = ["agent", "container", "src", "port"] as const;
+const SCOPES: readonly (readonly [SourceScope, string, string])[] = [
+  ["", "Any source", "Sources from any network"],
+  ["private", "Private", `Only private sources: ${PRIVATE_RANGE_LABEL}`],
+  ["public", "Public", "Only sources outside the private ranges"],
+];
+
+const TEXT_FILTER_KEYS = ["agent", "container", "src", "scope", "port"] as const;
 
 const inputClass =
   "border border-input bg-background text-foreground placeholder:text-muted-foreground px-2 py-1 rounded text-sm";
@@ -65,6 +85,10 @@ const pillClass = (active: boolean) =>
 
 function readView(value: string | null): View {
   return value === "live" || value === "7d" ? value : "24h";
+}
+
+function readScope(value: string | null): SourceScope {
+  return value === "private" || value === "public" ? value : "";
 }
 
 function readAction(value: string | null): ActionFilter {
@@ -200,7 +224,7 @@ function matchesLive(e: KeyedLogEntry, f: Filters): boolean {
   if (f.agent && e.agent !== f.agent) return false;
   if (f.container && !liveContainer(e).toLowerCase().includes(f.container.toLowerCase()))
     return false;
-  if (f.src && !(e.srcIP ?? "").startsWith(f.src)) return false;
+  if ((f.src || f.scope) && !sourceMatches(e.srcIP ?? "", f.src, f.scope)) return false;
   if (f.port && String(e.dstPort ?? "") !== f.port) return false;
   return true;
 }
@@ -304,6 +328,7 @@ function FleetTrafficLog() {
     agent: params.get("agent") ?? "",
     container: params.get("container") ?? "",
     src: params.get("src") ?? "",
+    scope: readScope(params.get("scope")),
     port: params.get("port") ?? "",
     action: readAction(params.get("action")),
   };
@@ -347,6 +372,8 @@ function FleetTrafficLog() {
   const agents = useQuery({ queryKey: queryKeys.agents(), queryFn: fetchAgents });
   const agentList = agents.data ?? [];
   const agentKnown = agentList.some((a) => a.instance_id === filters.agent);
+  const srcValid = isValidSourceFilter(filters.src);
+  const activeFilters = srcValid ? filters : { ...filters, src: "" };
 
   return (
     <div className="space-y-4 h-full flex flex-col">
@@ -395,10 +422,26 @@ function FleetTrafficLog() {
           id="logs-src"
           value={filters.src}
           onChange={(e) => set({ src: e.target.value.trim() })}
-          placeholder="Source IP or prefix"
+          placeholder="Source IP, prefix or CIDR"
           aria-label="Source"
-          className={cn(inputClass, "w-44")}
+          aria-invalid={!srcValid || undefined}
+          title={srcValid ? "e.g. 185.220.101.7, 172. or 172.16.0.0/12" : "Not a valid CIDR"}
+          className={cn(inputClass, "w-52", !srcValid && "border-destructive")}
         />
+        <div className="flex gap-1" role="group" aria-label="Source network">
+          {SCOPES.map(([s, label, hint]) => (
+            <button
+              key={label}
+              type="button"
+              title={hint}
+              aria-pressed={filters.scope === s}
+              onClick={() => set({ scope: s })}
+              className={pillClass(filters.scope === s)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <input
           id="logs-port"
           value={filters.port}
@@ -427,9 +470,9 @@ function FleetTrafficLog() {
       </div>
 
       {view === "live" ? (
-        <LiveStream filters={filters} showAgent onFilter={set} />
+        <LiveStream filters={activeFilters} showAgent onFilter={set} />
       ) : (
-        <FlowHistory view={view} filters={filters} onFilter={set} />
+        <FlowHistory view={view} filters={activeFilters} onFilter={set} />
       )}
 
       <p className="text-xs text-muted-foreground">
@@ -510,6 +553,7 @@ function FlowHistory({
     agent_id: filters.agent,
     container: filters.container,
     src: filters.src,
+    scope: filters.scope,
     port: filters.port,
     action: filters.action,
   };

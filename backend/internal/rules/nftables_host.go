@@ -36,6 +36,11 @@ func (b *NFTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 			Chain: chain,
 			Exprs: ctStateEstablishedRelatedAcceptExprs(),
 		})
+		b.conn.AddRule(&nftables.Rule{
+			Table: b.table,
+			Chain: chain,
+			Exprs: ctStateInvalidDropExprs(),
+		})
 	}
 
 	if NormaliseHostDefault(defaultPolicy) == "DROP" {

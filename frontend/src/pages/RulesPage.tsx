@@ -447,27 +447,27 @@ function CIDRList({
   items?: string[];
   variant?: "secondary" | "destructive";
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (!items || items.length === 0) return <span className="text-muted-foreground">—</span>;
-  if (items.length <= 3)
-    return (
-      <div className="flex flex-wrap gap-1">
-        {items.map((ip) => (
-          <Badge key={ip} variant={variant} className="font-mono text-xs">
-            {ip}
-          </Badge>
-        ))}
-      </div>
-    );
+  const collapsible = items.length > 3;
+  const shown = collapsible && !expanded ? items.slice(0, 2) : items;
   return (
     <div className="flex flex-wrap gap-1">
-      {items.slice(0, 2).map((ip) => (
+      {shown.map((ip) => (
         <Badge key={ip} variant={variant} className="font-mono text-xs">
           {ip}
         </Badge>
       ))}
-      <Badge variant="outline" className="text-xs">
-        +{items.length - 2} more
-      </Badge>
+      {collapsible && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {expanded ? "show less" : `+${items.length - 2} more`}
+        </button>
+      )}
     </div>
   );
 }

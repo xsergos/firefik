@@ -235,6 +235,7 @@ export interface FlowFilters {
   agent_id?: string;
   container?: string;
   src?: string;
+  scope?: "" | "private" | "public";
   port?: string;
   action?: "DROP" | "ACCEPT" | "";
 }

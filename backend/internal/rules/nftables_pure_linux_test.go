@@ -82,6 +82,34 @@ func TestCTStateExprsCanonical(t *testing.T) {
 	}
 }
 
+func TestCTStateInvalidDropExprs(t *testing.T) {
+	got := ctStateInvalidDropExprs()
+	if len(got) != 5 {
+		t.Fatalf("expected 5 exprs, got %d", len(got))
+	}
+	bw, ok := got[1].(*expr.Bitwise)
+	if !ok {
+		t.Fatalf("second expr should be *expr.Bitwise, got %T", got[1])
+	}
+	if string(bw.Mask) != string(binaryUint32(uint32(expr.CtStateBitINVALID))) {
+		t.Errorf("mask should select INVALID only, got %v", bw.Mask)
+	}
+	if v, ok := got[4].(*expr.Verdict); !ok || v.Kind != expr.VerdictDrop {
+		t.Errorf("last expr should be Verdict{Drop}, got %T", got[4])
+	}
+	for _, e := range got {
+		if _, ok := e.(*expr.Log); ok {
+			t.Fatal("invalid drop must not log")
+		}
+	}
+	if hasCTStateAcceptExprs(got) {
+		t.Fatal("invalid drop must not count as the ct accept rule")
+	}
+	if string(ctStateEstablishedRelatedAcceptExprs()[1].(*expr.Bitwise).Mask) == string(bw.Mask) {
+		t.Fatal("accept and invalid masks must differ")
+	}
+}
+
 func TestIifLoopbackAcceptExprs(t *testing.T) {
 	got := iifLoopbackAcceptExprs()
 	if len(got) != 3 {

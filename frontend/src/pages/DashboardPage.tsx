@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle } from "lucide-react";
@@ -63,28 +63,104 @@ function useFleetStats() {
 
 type AttentionItem = { key: string; text: string; to: string };
 
+const HIDDEN_ATTENTION_KEY = "firefik.dashboard.hiddenAttention";
+
+function readHiddenAttention(): string[] {
+  try {
+    const raw = window.localStorage.getItem(HIDDEN_ATTENTION_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeHiddenAttention(keys: string[]) {
+  try {
+    window.localStorage.setItem(HIDDEN_ATTENTION_KEY, JSON.stringify(keys));
+  } catch {
+    return;
+  }
+}
+
 function NeedsAttention({ items }: { items: AttentionItem[] }) {
+  const [hidden, setHidden] = useState<string[]>(readHiddenAttention);
+  const [showHidden, setShowHidden] = useState(false);
   if (items.length === 0) return null;
+
+  const updateHidden = (next: string[]) => {
+    setHidden(next);
+    writeHiddenAttention(next);
+    if (!items.some((i) => next.includes(i.key))) setShowHidden(false);
+  };
+  const hiddenItems = items.filter((i) => hidden.includes(i.key));
+  const visible = showHidden ? items : items.filter((i) => !hidden.includes(i.key));
+  const toggleLabel = showHidden ? "Hide hidden issues" : `Show hidden (${hiddenItems.length})`;
+
+  if (visible.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {plural(hiddenItems.length, "hidden issue")}.{" "}
+        <button
+          type="button"
+          onClick={() => setShowHidden(true)}
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          Show
+        </button>
+      </p>
+    );
+  }
+
   return (
     <section
       aria-labelledby="needs-attention-title"
       className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3"
     >
-      <h2
-        id="needs-attention-title"
-        className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300"
-      >
-        <AlertTriangle className="h-4 w-4" aria-hidden />
-        Needs attention
-      </h2>
-      <ul className="mt-1 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-        {items.map((item) => (
-          <li key={item.key}>
-            <Link to={item.to} className="underline underline-offset-2 hover:text-foreground">
-              {item.text}
-            </Link>
-          </li>
-        ))}
+      <div className="flex items-center justify-between gap-2">
+        <h2
+          id="needs-attention-title"
+          className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300"
+        >
+          <AlertTriangle className="h-4 w-4" aria-hidden />
+          Needs attention
+        </h2>
+        {hiddenItems.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowHidden((v) => !v)}
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            {toggleLabel}
+          </button>
+        )}
+      </div>
+      <ul className="mt-2 space-y-1 text-sm">
+        {visible.map((item) => {
+          const isHidden = hidden.includes(item.key);
+          return (
+            <li key={item.key} className="flex items-center justify-between gap-3">
+              <Link
+                to={item.to}
+                className={`underline underline-offset-2 hover:text-foreground ${isHidden ? "text-muted-foreground" : ""}`}
+              >
+                {item.text}
+              </Link>
+              <button
+                type="button"
+                onClick={() =>
+                  updateHidden(
+                    isHidden ? hidden.filter((k) => k !== item.key) : [...hidden, item.key],
+                  )
+                }
+                aria-label={`${isHidden ? "Unhide" : "Hide"}: ${item.text}`}
+                className="shrink-0 rounded px-2 py-0.5 text-xs text-muted-foreground hover:bg-amber-500/20 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {isHidden ? "Unhide" : "Hide"}
+              </button>
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

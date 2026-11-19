@@ -283,7 +283,7 @@ export function TrafficHelp() {
           },
           {
             title: "Filter",
-            text: "By agent, container, source address (or its beginning, like 185.220.), port, or Dropped / Accepted.",
+            text: "By agent, container, source address (its beginning, like 185.220., or a network, like 172.16.0.0/12), Private or Public sources, port, or Dropped / Accepted.",
           },
           {
             title: "Read “Matched rule”",
@@ -295,6 +295,11 @@ export function TrafficHelp() {
         Click an address, port, container or agent in any row to filter by it. The filters stay in
         the address bar, so you can share the view.
       </P>
+      <Callout title="Why are late replies not in the log?">
+        When the host closes a connection, a stray FIN or RST can still arrive from the other side.
+        The firewall no longer knows that connection, so the packet is invalid. Such packets are
+        dropped quietly and never appear here, because they are not new connection attempts.
+      </Callout>
       <Callout title="Want to see accepted traffic too?">
         Add <code>firefik.firewall.&lt;rule&gt;.log: &quot;true&quot;</code> to a rule. Logging is
         limited to 10 packets per second per rule, so it never floods the host.

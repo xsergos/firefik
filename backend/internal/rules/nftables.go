@@ -143,8 +143,15 @@ func hasCTStateAcceptExprs(exprs []expr.Any) bool {
 }
 
 func ctStateEstablishedRelatedAcceptExprs() []expr.Any {
-	mask := uint32(expr.CtStateBitESTABLISHED | expr.CtStateBitRELATED)
-	return []expr.Any{
+	return ctStateMatchExprs(uint32(expr.CtStateBitESTABLISHED|expr.CtStateBitRELATED), &expr.Verdict{Kind: expr.VerdictAccept})
+}
+
+func ctStateInvalidDropExprs() []expr.Any {
+	return ctStateMatchExprs(uint32(expr.CtStateBitINVALID), &expr.Counter{}, &expr.Verdict{Kind: expr.VerdictDrop})
+}
+
+func ctStateMatchExprs(mask uint32, tail ...expr.Any) []expr.Any {
+	return append([]expr.Any{
 		&expr.Ct{Register: 1, Key: expr.CtKeySTATE},
 		&expr.Bitwise{
 			SourceRegister: 1,
@@ -158,8 +165,7 @@ func ctStateEstablishedRelatedAcceptExprs() []expr.Any {
 			Register: 1,
 			Data:     binaryUint32(0),
 		},
-		&expr.Verdict{Kind: expr.VerdictAccept},
-	}
+	}, tail...)
 }
 
 func iifLoopbackAcceptExprs() []expr.Any {
@@ -440,6 +446,10 @@ func (b *NFTablesBackend) ApplyContainerRules(
 		Name:  mainChainName,
 		Table: b.table,
 	})
+
+	if b.stateful {
+		b.conn.AddRule(&nftables.Rule{Table: b.table, Chain: mainChain, Exprs: ctStateInvalidDropExprs()})
+	}
 
 	for _, ip := range containerIPs {
 		exprs := dstIPMatchExprs(ip)

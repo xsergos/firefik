@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -133,6 +134,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
 });
 
 describe("DashboardPage", () => {
@@ -277,6 +279,44 @@ describe("FleetDashboard (panel mode)", () => {
       "/logs",
     );
     expect(fleet.fetchFlows).toHaveBeenCalledWith({ since: "1h", action: "DROP" });
+  });
+
+  it("hides an attention item, remembers it and shows it again on request", async () => {
+    panelMode = true;
+    const fleet = await import("@/lib/fleetApi");
+    vi.mocked(fleet.fetchFleetStats).mockResolvedValue({
+      agents: { total: 2, healthy: 1, stale: 0, dead: 1, unknown: 0 },
+      containers: { total: 0, running: 0, enabled: 0 },
+      traffic: [],
+    });
+    vi.mocked(fleet.fetchFlows).mockResolvedValue({
+      ...noFlows,
+      summary: { ...noFlows.summary, total: 50 },
+    });
+    const user = userEvent.setup();
+    const view = renderPage();
+    const strip = await screen.findByRole("region", { name: "Needs attention" });
+    await waitFor(() => expect(strip.querySelectorAll("li")).toHaveLength(2));
+
+    await user.click(screen.getByRole("button", { name: /^Hide: 50 packets dropped/ }));
+    expect(screen.queryByRole("link", { name: /packets dropped/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "1 agent stopped reporting" })).toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem("firefik.dashboard.hiddenAttention") ?? "[]"),
+    ).toEqual(["drops"]);
+
+    await user.click(screen.getByRole("button", { name: "Show hidden (1)" }));
+    expect(screen.getByRole("link", { name: /packets dropped/ })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^Unhide: 50 packets dropped/ }));
+    expect(
+      screen.queryByRole("button", { name: /Show hidden|Hide hidden/ }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Hide: 1 agent/ }));
+    await user.click(screen.getByRole("button", { name: /^Hide: 50 packets/ }));
+    expect(screen.queryByRole("region", { name: "Needs attention" })).not.toBeInTheDocument();
+    expect(screen.getByText(/2 hidden issues/)).toBeInTheDocument();
+    view.unmount();
   });
 
   it("hides the attention strip when all is clear", async () => {

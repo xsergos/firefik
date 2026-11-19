@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/netip"
 	"testing"
 	"time"
 )
@@ -180,7 +181,21 @@ func TestHTTP_Flows(t *testing.T) {
 		t.Fatalf("total = %d", out.Summary.Total)
 	}
 
-	for _, q := range []string{"action=reject", "port=0", "port=x", "since=bogus", "limit=-1"} {
+	for q, want := range map[string]int64{
+		"since=24h&src=185.220.101.0/24":  42,
+		"since=24h&src=10.0.0.0/8":        5,
+		"since=24h&scope=private":         5,
+		"since=24h&scope=PUBLIC":          51,
+		"since=24h&src=185.&scope=public": 42,
+	} {
+		rec := doReq(t, srv.Handler(), http.MethodGet, "/v1/flows?"+q, "", "secret")
+		var got FlowResult
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &got) != nil || got.Summary.Total != want {
+			t.Errorf("%s: code=%d total=%d want %d", q, rec.Code, got.Summary.Total, want)
+		}
+	}
+
+	for _, q := range []string{"action=reject", "port=0", "port=x", "since=bogus", "limit=-1", "src=10.0.0.0/99", "scope=lan"} {
 		rec := doReq(t, srv.Handler(), http.MethodGet, "/v1/flows?"+q, "", "secret")
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("%s: got %d want 400", q, rec.Code)
@@ -191,5 +206,35 @@ func TestHTTP_Flows(t *testing.T) {
 	}
 	if rec := doReq(t, srv.Handler(), http.MethodPost, "/v1/flows", "", "secret"); rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("post: got %d", rec.Code)
+	}
+}
+
+func TestFlowQueryMatchesSource(t *testing.T) {
+	cases := []struct {
+		q    FlowQuery
+		src  string
+		want bool
+	}{
+		{FlowQuery{}, "", true},
+		{FlowQuery{Src: "172."}, "172.18.0.2", true},
+		{FlowQuery{SrcNet: netip.MustParsePrefix("172.16.0.0/12")}, "172.31.255.1", true},
+		{FlowQuery{SrcNet: netip.MustParsePrefix("172.16.0.0/12")}, "172.32.0.1", false},
+		{FlowQuery{SrcNet: netip.MustParsePrefix("172.16.0.0/12")}, "::ffff:172.20.0.1", true},
+		{FlowQuery{SrcNet: netip.MustParsePrefix("2001:db8::/32")}, "2001:db8::1", true},
+		{FlowQuery{SrcNet: netip.MustParsePrefix("10.0.0.0/8")}, "not-an-ip", false},
+		{FlowQuery{Scope: FlowScopePrivate}, "192.168.1.10", true},
+		{FlowQuery{Scope: FlowScopePrivate}, "100.64.3.4", true},
+		{FlowQuery{Scope: FlowScopePrivate}, "127.0.0.1", true},
+		{FlowQuery{Scope: FlowScopePrivate}, "fe80::1", true},
+		{FlowQuery{Scope: FlowScopePrivate}, "fd00::1", true},
+		{FlowQuery{Scope: FlowScopePrivate}, "31.41.158.252", false},
+		{FlowQuery{Scope: FlowScopePublic}, "31.41.158.252", true},
+		{FlowQuery{Scope: FlowScopePublic}, "10.1.2.3", false},
+		{FlowQuery{Scope: FlowScopePublic}, "", false},
+	}
+	for _, c := range cases {
+		if got := c.q.matchesSource(c.src); got != c.want {
+			t.Errorf("%+v matchesSource(%q) = %v, want %v", c.q, c.src, got, c.want)
+		}
 	}
 }

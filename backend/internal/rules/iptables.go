@@ -58,6 +58,8 @@ func defaultDropNflogArgs(perSecond int, label string) []string {
 	}
 }
 
+var ctInvalidDropArgs = []string{"-m", "conntrack", "--ctstate", "INVALID", "-j", "DROP"}
+
 func (b *IPTablesBackend) SetupChains() error {
 	_ = b.ipt.NewChain(filterTable, b.chainName)
 
@@ -139,6 +141,12 @@ func (b *IPTablesBackend) ApplyContainerRules(
 
 	if err := b.ipt.NewChain(filterTable, mainChain); err != nil {
 		_ = b.ipt.ClearChain(filterTable, mainChain)
+	}
+
+	if b.stateful {
+		if err := b.ipt.AppendUnique(filterTable, mainChain, ctInvalidDropArgs...); err != nil {
+			return fmt.Errorf("append conntrack INVALID drop: %w", err)
+		}
 	}
 
 	for _, ip := range containerIPs {

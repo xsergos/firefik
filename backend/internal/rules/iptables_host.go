@@ -35,6 +35,9 @@ func (b *IPTablesBackend) ApplyHostRules(rules []HostRule, defaultPolicy string)
 		); err != nil {
 			return fmt.Errorf("host: append ct accept: %w", err)
 		}
+		if err := b.ipt.Append(filterTable, hostChainName, ctInvalidDropArgs...); err != nil {
+			return fmt.Errorf("host: append ct invalid drop: %w", err)
+		}
 	}
 
 	if NormaliseHostDefault(defaultPolicy) == "DROP" {

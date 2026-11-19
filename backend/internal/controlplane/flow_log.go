@@ -3,6 +3,7 @@ package controlplane
 import (
 	"context"
 	"log/slog"
+	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
@@ -61,10 +62,48 @@ type FlowQuery struct {
 	AgentID   string
 	Container string
 	Src       string
+	SrcNet    netip.Prefix
+	Scope     string
 	Action    string
 	Port      int
 	Since     time.Time
 	Limit     int
+}
+
+const (
+	FlowScopePrivate = "private"
+	FlowScopePublic  = "public"
+)
+
+var cgnatPrefix = netip.MustParsePrefix("100.64.0.0/10")
+
+func isPrivateFlowSource(a netip.Addr) bool {
+	a = a.Unmap()
+	return a.IsPrivate() || a.IsLoopback() || a.IsLinkLocalUnicast() || cgnatPrefix.Contains(a)
+}
+
+func (q FlowQuery) matchesSource(src string) bool {
+	if q.Src != "" && !strings.HasPrefix(src, q.Src) {
+		return false
+	}
+	if !q.SrcNet.IsValid() && q.Scope == "" {
+		return true
+	}
+	addr, err := netip.ParseAddr(src)
+	if err != nil {
+		return false
+	}
+	addr = addr.Unmap()
+	if q.SrcNet.IsValid() && !q.SrcNet.Contains(addr) {
+		return false
+	}
+	switch q.Scope {
+	case FlowScopePrivate:
+		return isPrivateFlowSource(addr)
+	case FlowScopePublic:
+		return !isPrivateFlowSource(addr)
+	}
+	return true
 }
 
 type FlowRow struct {
@@ -124,10 +163,7 @@ func (q FlowQuery) matches(r FlowRecord) bool {
 	if q.Port > 0 && r.DstPort != q.Port {
 		return false
 	}
-	if q.Src != "" && !strings.HasPrefix(r.SrcIP, q.Src) {
-		return false
-	}
-	return true
+	return q.matchesSource(r.SrcIP)
 }
 
 func aggregateFlows(records []FlowRecord, q FlowQuery) FlowResult {

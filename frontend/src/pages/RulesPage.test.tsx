@@ -122,6 +122,12 @@ describe("RulesPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("+3 more")).toBeInTheDocument());
     expect(screen.getByText("any")).toBeInTheDocument();
+    expect(screen.queryByText("5.0.0.0/24")).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "+3 more" }));
+    expect(screen.getByText("5.0.0.0/24")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "show less" }));
+    expect(screen.queryByText("5.0.0.0/24")).not.toBeInTheDocument();
   });
 
   it("renders geo allow/block badges when present", async () => {

@@ -328,6 +328,40 @@ describe("LogsPage in panel mode", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(/^\?view=7d$/);
   });
 
+  it("filters by CIDR and private or public sources, holding back an unfinished CIDR", async () => {
+    const user = userEvent.setup();
+    const api = await import("@/lib/fleetApi");
+    vi.mocked(api.fetchFlows).mockResolvedValue(oneRow());
+    renderPanel("/logs?src=172.16.0.0/12");
+    await screen.findByText("185.220.101.7");
+    expect(api.fetchFlows).toHaveBeenCalledWith(
+      expect.objectContaining({ src: "172.16.0.0/12", scope: "" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Private" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("scope=private");
+    await waitFor(() =>
+      expect(api.fetchFlows).toHaveBeenLastCalledWith(
+        expect.objectContaining({ src: "172.16.0.0/12", scope: "private" }),
+      ),
+    );
+
+    const source = screen.getByLabelText("Source");
+    await user.clear(source);
+    await user.type(source, "10.0.0.0/");
+    expect(source).toHaveAttribute("aria-invalid", "true");
+    await waitFor(() =>
+      expect(api.fetchFlows).toHaveBeenLastCalledWith(
+        expect.objectContaining({ src: "", scope: "private" }),
+      ),
+    );
+
+    await user.click(screen.getByRole("button", { name: "Public" }));
+    expect(screen.getByTestId("location")).toHaveTextContent("scope=public");
+    await user.click(screen.getByRole("button", { name: "Any source" }));
+    expect(screen.getByTestId("location")).not.toHaveTextContent("scope=");
+  });
+
   it("renders control-plane live lines in the Live view in source → container order", async () => {
     const user = userEvent.setup();
     const api = await import("@/lib/fleetApi");
