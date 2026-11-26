@@ -7,7 +7,7 @@ services:
       FIREFIK_AUDIT_SINK_MAX_SIZE_MB: "0"
 
   mock-target:
-    image: nginx:1.27-alpine
+    image: nginx:1.30-alpine
     container_name: ${STACK_PREFIX:-firefik}-e2e-target
     restart: "no"
     labels:
